@@ -6,7 +6,7 @@ licenses = "MIT"
 authors = ["Fabien Chouteau", "Joffrey Huguet"]
 maintainers= ["Fabien-Chouteau <chouteau@adacore.com>", "Joffrey Huguet <huguet@adacore.com>"]
 maintainers-logins = ["Fabien-Chouteau", "joffreyhuguet"]
-website = "https://github.com/Fabien-Chouteau/qoi-spark"
+website = "https://github.com/modelcode-morph-playground/qoi-ada"
 tags = ["image", "encoding", "qoi"]
 
 [[depends-on]]

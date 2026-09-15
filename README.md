@@ -1,7 +1,11 @@
-# qoi-spark
-“Quite OK Image” Ada/SPARK implementation
+# qoi-ada
 
-This is based on [QOI](https://qoiformat.org/) format specification V1.
+Ada implementation of the "Quite OK Image" (QOI) codec, based on the
+[QOI](https://qoiformat.org/) format specification V1.
+
+Pure-Ada source mirror of [Fabien-Chouteau/qoi-spark](https://github.com/Fabien-Chouteau/qoi-spark)
+(MIT), used as the source repository for the modelcode end-to-end regression's
+**Ada → C++** migration scenario (`qoi_ada_to_cpp`).
 
 To call the `Encode`/`Decode` procedure you have to provide a large enough
 output buffer. If the provided output buffer is not large enough, each
