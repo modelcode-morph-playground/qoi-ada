@@ -1,0 +1,30 @@
+--  Builds the Ada driver of the differential test (tests/ada_diff_test.cpp).
+--
+--  The project "qoi" is found through the GPR_PROJECT_PATH environment
+--  variable, which must name the directory holding qoi.gpr (with its src/ and
+--  config/qoi_config.gpr). tests/ada/run_ada_diff.cmake does this
+--  automatically. By hand:
+--
+--     GPR_PROJECT_PATH=<dir with qoi.gpr> gprbuild -P tests/ada/qoi_driver.gpr
+--
+--  (A GPR "with" clause only accepts a literal path, so the location of the
+--  Ada project cannot be a gprbuild external variable.)
+with "qoi";
+
+project QOI_Driver is
+
+   for Source_Dirs use (".");
+   for Object_Dir use "obj";
+   for Exec_Dir use ".";
+   for Main use ("qoi_driver.adb");
+   for Create_Missing_Dirs use "True";
+
+   package Compiler is
+      for Default_Switches ("Ada") use ("-O1", "-gnat2012", "-gnatwa");
+   end Compiler;
+
+   package Binder is
+      for Switches ("Ada") use ("-Es");
+   end Binder;
+
+end QOI_Driver;
