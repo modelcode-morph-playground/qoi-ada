@@ -59,10 +59,9 @@ target_link_libraries(qoi_diff_ref PRIVATE qoi_reference)
 set(QOI_ADA_PROJECT_DIR "${PROJECT_SOURCE_DIR}/legacy/ada" CACHE PATH
     "Directory with qoi.gpr and src/ of the Ada implementation (optional Ada differential test)")
 
-add_executable(qoi_ada_diff ada_diff_test.cpp)
-target_link_libraries(qoi_ada_diff PRIVATE qoi::qoi qoi_warnings qoi_sanitizers)
-target_include_directories(qoi_ada_diff PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-set_target_properties(qoi_ada_diff PROPERTIES CXX_EXTENSIONS OFF)
+qoi_add_executable(qoi_ada_diff
+    SOURCES ada_diff_test.cpp
+    LIBRARIES qoi::qoi qoi_sanitizers)
 
 # The file protocol and the comparison logic, exercised without Ada: the helper
 # plays the Ada driver itself and must also notice deliberately damaged results.
@@ -95,12 +94,9 @@ set_tests_properties(qoi_ada_diff PROPERTIES
 # malformed streams) through qoi_fuzz_replay.
 option(QOI_BUILD_FUZZ "Build the libFuzzer decode fuzz target when the toolchain supports it" ON)
 
-add_executable(qoi_fuzz_replay
-    fuzz/decode_fuzz.cpp
-    fuzz/replay_main.cpp)
-target_link_libraries(qoi_fuzz_replay PRIVATE qoi::qoi qoi_warnings qoi_sanitizers)
-target_include_directories(qoi_fuzz_replay PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-set_target_properties(qoi_fuzz_replay PROPERTIES CXX_EXTENSIONS OFF)
+qoi_add_executable(qoi_fuzz_replay
+    SOURCES fuzz/decode_fuzz.cpp fuzz/replay_main.cpp
+    LIBRARIES qoi::qoi qoi_sanitizers)
 
 add_test(NAME qoi_fuzz_corpus
     COMMAND qoi_fuzz_replay ${CMAKE_CURRENT_SOURCE_DIR}/fuzz/corpus)
@@ -114,8 +110,10 @@ if(QOI_BUILD_FUZZ)
 
     if(MSVC)
         set(_qoi_fuzzer_flag "/fsanitize=fuzzer")
+        set(_qoi_fuzz_compile_options /fsanitize=fuzzer /fsanitize=address)
     else()
         set(_qoi_fuzzer_flag "-fsanitize=fuzzer,address")
+        set(_qoi_fuzz_compile_options -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer)
     endif()
 
     cmake_push_check_state(RESET)
@@ -137,21 +135,14 @@ extern \"C\" int LLVMFuzzerTestOneInput(const std::uint8_t*, std::size_t) { retu
         target_compile_features(qoi_fuzz_instrumented PUBLIC cxx_std_17)
         set_target_properties(qoi_fuzz_instrumented PROPERTIES CXX_EXTENSIONS OFF)
         target_link_libraries(qoi_fuzz_instrumented PRIVATE qoi_warnings)
-        if(MSVC)
-            target_compile_options(qoi_fuzz_instrumented PRIVATE /fsanitize=fuzzer /fsanitize=address)
-        else()
-            target_compile_options(qoi_fuzz_instrumented PRIVATE -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer)
-        endif()
+        target_compile_options(qoi_fuzz_instrumented PRIVATE ${_qoi_fuzz_compile_options})
 
-        add_executable(qoi_decode_fuzz fuzz/decode_fuzz.cpp)
-        target_link_libraries(qoi_decode_fuzz PRIVATE qoi_fuzz_instrumented qoi_warnings)
-        target_include_directories(qoi_decode_fuzz PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-        set_target_properties(qoi_decode_fuzz PROPERTIES CXX_EXTENSIONS OFF)
-        if(MSVC)
-            target_compile_options(qoi_decode_fuzz PRIVATE /fsanitize=fuzzer /fsanitize=address)
-        else()
-            target_compile_options(qoi_decode_fuzz PRIVATE -fsanitize=fuzzer-no-link,address -fno-omit-frame-pointer)
-            target_link_options(qoi_decode_fuzz PRIVATE -fsanitize=fuzzer,address)
+        qoi_add_executable(qoi_decode_fuzz
+            SOURCES fuzz/decode_fuzz.cpp
+            LIBRARIES qoi_fuzz_instrumented)
+        target_compile_options(qoi_decode_fuzz PRIVATE ${_qoi_fuzz_compile_options})
+        if(NOT MSVC)
+            target_link_options(qoi_decode_fuzz PRIVATE ${_qoi_fuzzer_flag})
         endif()
         message(STATUS "qoi: libFuzzer decode fuzz target enabled (qoi_decode_fuzz)")
     else()
@@ -160,6 +151,7 @@ extern \"C\" int LLVMFuzzerTestOneInput(const std::uint8_t*, std::size_t) { retu
                        "qoi_fuzz_corpus test still are)")
     endif()
     unset(_qoi_fuzzer_flag)
+    unset(_qoi_fuzz_compile_options)
 else()
     message(STATUS "qoi: QOI_BUILD_FUZZ is OFF; qoi_decode_fuzz is not built")
 endif()

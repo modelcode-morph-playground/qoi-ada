@@ -33,6 +33,28 @@ endif()
 include(GoogleTest)
 
 # ---------------------------------------------------------------------------
+# qoi_add_executable(<name> SOURCES <files...> [LIBRARIES <targets...>])
+#
+# Shared boilerplate for every first-party test executable: builds <name> from
+# SOURCES, links LIBRARIES plus the build-only qoi_warnings target, adds the
+# tests/ directory to the include path, and disables compiler extensions.
+# qoi_add_test() builds on it; non-GoogleTest executables (the Ada diff helper,
+# the fuzz replay driver, the libFuzzer target) call it directly.
+# ---------------------------------------------------------------------------
+function(qoi_add_executable name)
+    cmake_parse_arguments(PARSE_ARGV 1 QAE "" "" "SOURCES;LIBRARIES")
+
+    if(NOT QAE_SOURCES)
+        message(FATAL_ERROR "qoi_add_executable(${name}): SOURCES is required")
+    endif()
+
+    add_executable(${name} ${QAE_SOURCES})
+    target_link_libraries(${name} PRIVATE ${QAE_LIBRARIES} qoi_warnings)
+    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+    set_target_properties(${name} PROPERTIES CXX_EXTENSIONS OFF)
+endfunction()
+
+# ---------------------------------------------------------------------------
 # qoi_add_test(<name> SOURCES <files...> [LABELS <labels...>])
 #
 # Builds the executable <name> from SOURCES, links it against qoi::qoi,
@@ -56,14 +78,9 @@ function(qoi_add_test name)
         message(FATAL_ERROR "qoi_add_test(${name}): SOURCES is required")
     endif()
 
-    add_executable(${name} ${QAT_SOURCES})
-    target_link_libraries(${name} PRIVATE
-        qoi::qoi
-        GTest::gtest_main
-        qoi_warnings
-        qoi_sanitizers)
-    target_include_directories(${name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-    set_target_properties(${name} PROPERTIES CXX_EXTENSIONS OFF)
+    qoi_add_executable(${name}
+        SOURCES ${QAT_SOURCES}
+        LIBRARIES qoi::qoi GTest::gtest_main qoi_sanitizers)
 
     set(_qat_properties)
     if(QAT_LABELS)
