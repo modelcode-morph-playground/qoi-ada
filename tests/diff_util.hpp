@@ -46,6 +46,11 @@ inline bool chance(std::mt19937& rng, std::uint32_t one_in) { return below(rng, 
 // Wrappers around the library under test
 // ---------------------------------------------------------------------------
 
+// Colorspace of a header/descriptor colorspace byte: 0 is sRGB, anything else linear alpha.
+inline qoi::Colorspace cs_of(unsigned v) {
+    return v == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha;
+}
+
 // Encodes with qoi::encode into a right-sized vector. Returns an empty vector if
 // the library reports failure.
 inline Bytes ours_encode(const Bytes& pix, std::uint64_t width, std::uint64_t height,

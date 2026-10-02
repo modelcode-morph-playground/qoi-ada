@@ -91,10 +91,6 @@ RefDecoded ref_decode(const Bytes& data) {
     return r;
 }
 
-qoi::Colorspace cs_of(unsigned v) {
-    return v == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha;
-}
-
 // Both decoders must accept `stream` and reproduce `original` exactly, with
 // header fields matching.
 void expect_decodes_to(const Bytes& stream, const Bytes& original, unsigned w, unsigned h,
@@ -125,7 +121,7 @@ struct Encoded {
 Encoded encode_both(const Bytes& pix, unsigned w, unsigned h, unsigned channels,
                     unsigned colorspace) {
     Encoded e;
-    e.ours = difftest::ours_encode(pix, w, h, channels, cs_of(colorspace));
+    e.ours = difftest::ours_encode(pix, w, h, channels, difftest::cs_of(colorspace));
     e.ref = ref_encode(pix, w, h, channels, colorspace);
     return e;
 }

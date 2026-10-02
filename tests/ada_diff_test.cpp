@@ -216,9 +216,8 @@ private:
     void add_encode(const std::string& name, const Bytes& pix, unsigned w, unsigned h,
                     unsigned channels, unsigned colorspace) {
         const std::string id = id_of('e', encodes_++, 4);
-        const Bytes stream = difftest::ours_encode(
-            pix, w, h, channels,
-            colorspace == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha);
+        const Bytes stream =
+            difftest::ours_encode(pix, w, h, channels, difftest::cs_of(colorspace));
         if (stream.empty()) {
             std::cerr << "qoi::encode failed for " << name << "\n";
             ok_ = false;
@@ -335,9 +334,8 @@ int emulate(const std::string& dir) {
             if (!read_file(path_of(dir, e.id + ".raw"), pix)) {
                 return 1;
             }
-            const Bytes stream = difftest::ours_encode(
-                pix, e.width, e.height, e.channels,
-                e.colorspace == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha);
+            const Bytes stream = difftest::ours_encode(pix, e.width, e.height, e.channels,
+                                                       difftest::cs_of(e.colorspace));
             if (!write_file(path_of(dir, e.id + ".ada.qoi"), stream)) {
                 return 1;
             }
