@@ -86,3 +86,7 @@ qoi_add_test(qoi_smoke SOURCES smoke_test.cpp LABELS smoke healthcheck)
 # roundtrip, contract, differential, fuzz), or include()s a per-family cmake
 # snippet. Only register sources that exist.
 # ===== END per-family test registrations =====
+
+# Each file below is owned by one test family and registers its own executables.
+include(${CMAKE_CURRENT_LIST_DIR}/codec_tests.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/differential_tests.cmake)
