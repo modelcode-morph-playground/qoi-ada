@@ -210,7 +210,6 @@ public:
     [[nodiscard]] qoi::Span<const std::uint8_t> span() const noexcept {
         return qoi::Span<const std::uint8_t>(data_.get(), size_);
     }
-    [[nodiscard]] std::size_t size() const noexcept { return size_; }
 
 private:
     std::size_t size_;

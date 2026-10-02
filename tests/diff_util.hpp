@@ -187,10 +187,8 @@ inline DeltaOp classify_signed_char(int dr, int dg, int db) {
 }
 
 struct WrapInfo {
-    bool wraps = false;           // any pixel selects different opcode classes
-    std::size_t first_pixel = 0;  // pixel index of the first such pixel
-    std::size_t count = 0;        // number of such pixels
-    DeltaOp ada = DeltaOp::Rgb;   // classes at the first such pixel
+    bool wraps = false;          // any pixel selects different opcode classes
+    DeltaOp ada = DeltaOp::Rgb;  // classes at the first such pixel
     DeltaOp reference = DeltaOp::Rgb;
 };
 
@@ -229,11 +227,9 @@ inline WrapInfo find_wraparound_delta(const Bytes& pixels, unsigned channels) {
             if (ada != ref) {
                 if (!info.wraps) {
                     info.wraps = true;
-                    info.first_pixel = i;
                     info.ada = ada;
                     info.reference = ref;
                 }
-                ++info.count;
             }
         }
         prev = px;
@@ -254,7 +250,6 @@ struct Crafted {
     unsigned height = 0;
     unsigned channels = 3;
     Bytes pixels;
-    bool expect_wrap = false;
     // For wrapping cases: hand-derived offset of the first differing byte
     // between qoi::encode and qoi.h's qoi_encode (see differential_ref_test.cpp).
     std::size_t expect_first_diff = 0;
@@ -283,16 +278,10 @@ struct Builder {
         }
         return *this;
     }
-    Builder& rgba_n(int r, int g, int b, int a, int n) {
-        for (int i = 0; i < n; ++i) {
-            rgba(r, g, b, a);
-        }
-        return *this;
-    }
     std::size_t count() const { return px.size() / channels; }
 };
 
-inline Crafted make(const std::string& name, const Builder& b, bool wrap, std::size_t diff_at = 0,
+inline Crafted make(const std::string& name, const Builder& b, std::size_t diff_at = 0,
                     unsigned width = 0) {
     Crafted c;
     c.name = name;
@@ -302,7 +291,6 @@ inline Crafted make(const std::string& name, const Builder& b, bool wrap, std::s
     c.width = width == 0 ? n : width;
     c.height = n / c.width;
     c.pixels = b.px;
-    c.expect_wrap = wrap;
     c.expect_first_diff = diff_at;
     return c;
 }
@@ -315,29 +303,26 @@ inline std::vector<Crafted> crafted_clean_cases() {
     using detail::make;
     std::vector<Crafted> v;
 
-    v.push_back(make("SingleBlackPixel", Builder{3}.rgb(0, 0, 0), false));
-    v.push_back(make("SingleOpaqueBlackPixelRgba", Builder{4}.rgba(0, 0, 0, 255), false));
-    v.push_back(make("SingleMidPixel", Builder{3}.rgb(10, 20, 30), false));
+    v.push_back(make("SingleBlackPixel", Builder{3}.rgb(0, 0, 0)));
+    v.push_back(make("SingleOpaqueBlackPixelRgba", Builder{4}.rgba(0, 0, 0, 255)));
+    v.push_back(make("SingleMidPixel", Builder{3}.rgb(10, 20, 30)));
     // From (200,200,200): +55 is out of every delta range, as is -155; both
     // rules pick RGB (wrapped: -101, still out of range).
-    v.push_back(make(
-        "LargeJumpsStayRgb",
-        Builder{3}.rgb(200, 200, 200).rgb(255, 255, 255).rgb(100, 100, 100).rgb(0, 0, 0), false));
-    // 128 apart: wrapped -128, out of range.
     v.push_back(
-        make("Jump128", Builder{3}.rgb(128, 128, 128).rgb(0, 0, 0).rgb(128, 128, 128), false));
+        make("LargeJumpsStayRgb",
+             Builder{3}.rgb(200, 200, 200).rgb(255, 255, 255).rgb(100, 100, 100).rgb(0, 0, 0)));
+    // 128 apart: wrapped -128, out of range.
+    v.push_back(make("Jump128", Builder{3}.rgb(128, 128, 128).rgb(0, 0, 0).rgb(128, 128, 128)));
     // DIFF boundaries -2 and +1 per channel, then LUMA boundaries.
-    v.push_back(make("DiffBoundaries",
-                     Builder{3}
-                         .rgb(100, 100, 100)
-                         .rgb(98, 98, 98)
-                         .rgb(99, 99, 99)
-                         .rgb(97, 100, 98)
-                         .rgb(98, 101, 99),
-                     false));
+    v.push_back(make("DiffBoundaries", Builder{3}
+                                           .rgb(100, 100, 100)
+                                           .rgb(98, 98, 98)
+                                           .rgb(99, 99, 99)
+                                           .rgb(97, 100, 98)
+                                           .rgb(98, 101, 99)));
     // LUMA: dg = +31 with dr-dg = +7, db-dg = -8; then dg = -32 with dr-dg = -8, db-dg = +7.
-    v.push_back(make("LumaBoundaries",
-                     Builder{3}.rgb(100, 100, 100).rgb(138, 131, 123).rgb(113, 99, 130), false));
+    v.push_back(
+        make("LumaBoundaries", Builder{3}.rgb(100, 100, 100).rgb(138, 131, 123).rgb(113, 99, 130)));
     v.push_back(make(
         "AscendingGrayRamp",
         [] {
@@ -347,46 +332,39 @@ inline std::vector<Crafted> crafted_clean_cases() {
             }
             return b;
         }(),
-        false, 0, 16));
+        0, 16));
     v.push_back(make(
         "RunsOf62And63And124",
-        Builder{3}.rgb(5, 6, 7).rgb_n(40, 50, 60, 62).rgb_n(1, 2, 3, 63).rgb_n(200, 100, 50, 124),
-        false));
-    v.push_back(make("RunAtLastPixel", Builder{3}.rgb(9, 9, 9).rgb_n(77, 78, 79, 70), false));
-    v.push_back(make("RgbaAlphaChanges",
-                     Builder{4}
-                         .rgba(10, 20, 30, 255)
-                         .rgba(11, 21, 31, 255)
-                         .rgba(11, 21, 31, 128)
-                         .rgba(12, 22, 32, 128)
-                         .rgba(12, 22, 32, 0)
-                         .rgba(250, 5, 3, 0),
-                     false));
+        Builder{3}.rgb(5, 6, 7).rgb_n(40, 50, 60, 62).rgb_n(1, 2, 3, 63).rgb_n(200, 100, 50, 124)));
+    v.push_back(make("RunAtLastPixel", Builder{3}.rgb(9, 9, 9).rgb_n(77, 78, 79, 70)));
+    v.push_back(make("RgbaAlphaChanges", Builder{4}
+                                             .rgba(10, 20, 30, 255)
+                                             .rgba(11, 21, 31, 255)
+                                             .rgba(11, 21, 31, 128)
+                                             .rgba(12, 22, 32, 128)
+                                             .rgba(12, 22, 32, 0)
+                                             .rgba(250, 5, 3, 0)));
     // The alpha change forces RGBA even though the colour delta alone would wrap.
-    v.push_back(make("AlphaChangeSuppressesDeltas",
-                     Builder{4}.rgba(200, 200, 200, 255).rgba(0, 0, 0, 10), false));
+    v.push_back(
+        make("AlphaChangeSuppressesDeltas", Builder{4}.rgba(200, 200, 200, 255).rgba(0, 0, 0, 10)));
     // Palette: later occurrences are INDEX hits.
-    v.push_back(make("PaletteIndexHits",
-                     Builder{3}
-                         .rgb(10, 200, 30)
-                         .rgb(90, 20, 60)
-                         .rgb(10, 200, 30)
-                         .rgb(90, 20, 60)
-                         .rgb(200, 10, 10)
-                         .rgb(10, 200, 30),
-                     false));
+    v.push_back(make("PaletteIndexHits", Builder{3}
+                                             .rgb(10, 200, 30)
+                                             .rgb(90, 20, 60)
+                                             .rgb(10, 200, 30)
+                                             .rgb(90, 20, 60)
+                                             .rgb(200, 10, 10)
+                                             .rgb(10, 200, 30)));
     // (255,255,255) is reached cleanly from (200,200,200); the last pixel is an
     // INDEX hit for it, although the delta from (0,0,0) would wrap to +1.
-    v.push_back(make("IndexHitSuppressesWrapAround",
-                     Builder{3}
-                         .rgb(200, 200, 200)
-                         .rgb(255, 255, 255)
-                         .rgb(100, 100, 100)
-                         .rgb(0, 0, 0)
-                         .rgb(255, 255, 255),
-                     false));
+    v.push_back(make("IndexHitSuppressesWrapAround", Builder{3}
+                                                         .rgb(200, 200, 200)
+                                                         .rgb(255, 255, 255)
+                                                         .rgb(100, 100, 100)
+                                                         .rgb(0, 0, 0)
+                                                         .rgb(255, 255, 255)));
     v.push_back(make("RgbaPaletteWithZeroPixel",
-                     Builder{4}.rgba(0, 0, 0, 0).rgba(0, 0, 0, 255).rgba(0, 0, 0, 0), false));
+                     Builder{4}.rgba(0, 0, 0, 0).rgba(0, 0, 0, 255).rgba(0, 0, 0, 0)));
     return v;
 }
 
@@ -402,27 +380,26 @@ inline std::vector<Crafted> crafted_wrapping_cases() {
     std::vector<Crafted> v;
 
     // Start state is (0,0,0,255): white is +255 per channel = -1 wrapped.
-    v.push_back(make("WrapAroundFirstPixelWhite", Builder{3}.rgb(255, 255, 255), true, 14));
+    v.push_back(make("WrapAroundFirstPixelWhite", Builder{3}.rgb(255, 255, 255), 14));
     // 255 -> 0: RGB(200), RGB(255), then (0,0,0): d = -255 -> +1 (DIFF).
     v.push_back(make("WrapAround255To0Diff",
-                     Builder{3}.rgb(200, 200, 200).rgb(255, 255, 255).rgb(0, 0, 0), true, 22));
+                     Builder{3}.rgb(200, 200, 200).rgb(255, 255, 255).rgb(0, 0, 0), 22));
     // 0 -> 255: RGB(100), RGB(0), then 255: d = +255 -> -1 (DIFF).
     v.push_back(make("WrapAround0To255Diff",
-                     Builder{3}.rgb(100, 100, 100).rgb(0, 0, 0).rgb(255, 255, 255), true, 22));
+                     Builder{3}.rgb(100, 100, 100).rgb(0, 0, 0).rgb(255, 255, 255), 22));
     // 254 -> 1: d = -253 -> +3: outside DIFF, inside LUMA (dg=3, dr-dg=0).
     v.push_back(make("WrapAround254To1Luma",
-                     Builder{3}.rgb(200, 200, 200).rgb(254, 254, 254).rgb(1, 1, 1), true, 22));
+                     Builder{3}.rgb(200, 200, 200).rgb(254, 254, 254).rgb(1, 1, 1), 22));
     // 10 -> 246: d = +236 -> -20 (LUMA); the previous pixel is a legitimate LUMA (2 bytes).
-    v.push_back(make("WrapAroundLumaGreenMinus20", Builder{3}.rgb(10, 10, 10).rgb(246, 246, 246),
-                     true, 16));
+    v.push_back(
+        make("WrapAroundLumaGreenMinus20", Builder{3}.rgb(10, 10, 10).rgb(246, 246, 246), 16));
     // Only red wraps; green and blue move by +1.
     v.push_back(
-        make("WrapAroundSingleChannel", Builder{3}.rgb(0, 100, 100).rgb(255, 101, 101), true, 18));
+        make("WrapAroundSingleChannel", Builder{3}.rgb(0, 100, 100).rgb(255, 101, 101), 18));
     // 1 -> 255: d = +254 -> -2, the lower DIFF bound. (1,1,1) is a legitimate DIFF (1 byte).
-    v.push_back(
-        make("WrapAroundDiffLowerBound", Builder{3}.rgb(1, 1, 1).rgb(255, 255, 255), true, 15));
+    v.push_back(make("WrapAroundDiffLowerBound", Builder{3}.rgb(1, 1, 1).rgb(255, 255, 255), 15));
     // 0 -> 225: d = +225 -> -31, inside LUMA (dg=-31, dr-dg=0).
-    v.push_back(make("WrapAroundLumaGreenMinus31", Builder{3}.rgb(225, 225, 225), true, 14));
+    v.push_back(make("WrapAroundLumaGreenMinus31", Builder{3}.rgb(225, 225, 225), 14));
     // Same as 255->0 with four channels and unchanged alpha, then an alpha change.
     v.push_back(make("WrapAround255To0Rgba",
                      Builder{4}
@@ -430,12 +407,12 @@ inline std::vector<Crafted> crafted_wrapping_cases() {
                          .rgba(255, 255, 255, 255)
                          .rgba(0, 0, 0, 255)
                          .rgba(10, 20, 30, 128),
-                     true, 22));
+                     22));
     // A run in front of the wrapping pixel: RGB(4) RGB(4) RUN62(1) RUN7(1), then the pixel.
     v.push_back(
         make("WrapAroundAfterRuns",
              Builder{3}.rgb(200, 200, 200).rgb(255, 255, 255).rgb_n(255, 255, 255, 69).rgb(0, 0, 0),
-             true, 24));
+             24));
     return v;
 }
 
