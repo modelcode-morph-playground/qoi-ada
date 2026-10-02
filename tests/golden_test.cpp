@@ -42,14 +42,10 @@ namespace {
 using qoi_test::Bytes;
 using qoi_test::BytesEqual;
 using qoi_test::DescEq;
+using qoi_test::kMaxDim;
+using qoi_test::kStorageLast;
 using qoi_test::make_desc;
-
-constexpr std::uint64_t kStorageLast = 0x7FFFFFFFFFFFFFFFULL;  // Storage_Count'Last
-constexpr std::uint64_t kMaxDim = 0x7FFFFFFFULL;               // Integer_32'Last
-
-// Brace lists of 64-bit values; avoids deduction trouble between uint64_t and
-// unsigned long long literals on platforms where they are distinct types.
-using U64List = std::initializer_list<std::uint64_t>;
+using qoi_test::U64List;
 
 qoi::Desc rgb_desc(std::uint64_t width, std::uint64_t height,
                    qoi::Colorspace cs = qoi::Colorspace::SRGB) {
@@ -98,17 +94,6 @@ void check_golden(const qoi::Desc& desc, const Bytes& pix, const Bytes& chunks) 
     ASSERT_EQ(decoded_size, pix.size());
     EXPECT_TRUE(DescEq(desc, decoded_desc));
     EXPECT_TRUE(BytesEqual(pix, decoded));
-}
-
-// A repeated pixel value: `count` pixels of (r,g,b).
-Bytes repeat_rgb(std::size_t count, std::uint8_t r, std::uint8_t g, std::uint8_t b) {
-    Bytes pix;
-    for (std::size_t i = 0; i < count; ++i) {
-        pix.push_back(r);
-        pix.push_back(g);
-        pix.push_back(b);
-    }
-    return pix;
 }
 
 // Two-pixel 3-channel image used by the DIFF/LUMA/RGB boundary tables. The first
@@ -198,7 +183,7 @@ TEST(Golden, HeaderChannelsAndColorspaceBytes) {
 // four full runs of 62 (4*62 = 248 -> FD each, the run counter reaches 62), then
 // the remaining 10 pixels are flushed at the last pixel as run 10 -> C0|9 = C9.
 TEST(Golden, HeaderWidthIsBigEndian258) {
-    const Bytes pix = repeat_rgb(258, 0, 0, 0);
+    const Bytes pix = qoi_test::flat_image(258, 1, 3, {0, 0, 0});
     check_golden(rgb_desc(258, 1, qoi::Colorspace::SRGB_Linear_Alpha), pix,
                  {0xFD, 0xFD, 0xFD, 0xFD, 0xC9});
     EXPECT_EQ(qoi_test::header(258, 1, 3, 1), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x01, 0x02,
@@ -208,7 +193,7 @@ TEST(Golden, HeaderWidthIsBigEndian258) {
 // Height is stored big-endian too: 1x258 gives height bytes 00 00 01 02, and the
 // same chunk stream as above (the pixel order does not matter for a flat image).
 TEST(Golden, HeaderHeightIsBigEndian258) {
-    const Bytes pix = repeat_rgb(258, 0, 0, 0);
+    const Bytes pix = qoi_test::flat_image(258, 1, 3, {0, 0, 0});
     check_golden(rgb_desc(1, 258), pix, {0xFD, 0xFD, 0xFD, 0xFD, 0xC9});
     EXPECT_EQ(qoi_test::header(1, 258, 3, 0), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01,
                                                      0x00, 0x00, 0x01, 0x02, 0x03, 0x00}));
@@ -218,7 +203,7 @@ TEST(Golden, HeaderHeightIsBigEndian258) {
 // 65536 black pixels = 1057 * 62 + 2 (1057*62 = 65534): 1057 runs of 62 (FD), then
 // the last 2 pixels flush at the final pixel as run 2 -> C1.
 TEST(Golden, HeaderWidthThirdByte65536) {
-    const Bytes pix = repeat_rgb(65536, 0, 0, 0);
+    const Bytes pix = qoi_test::flat_image(65536, 1, 3, {0, 0, 0});
     Bytes chunks(1058, 0xFD);
     chunks.back() = 0xC1;
     check_golden(rgb_desc(65536, 1), pix, chunks);
@@ -486,31 +471,39 @@ TEST(Golden, JustOutsideLumaFallsThroughToRgb) {
 
 // Runs of black pixels (equal to the initial previous pixel). A run is flushed when
 // the counter reaches 62 (chunk C0|61 = FD) or at the final pixel (chunk C0|(n-1)).
-TEST(Golden, RunLength1) { check_golden(rgb_desc(1, 1), repeat_rgb(1, 0, 0, 0), {0xC0}); }
+TEST(Golden, RunLength1) {
+    check_golden(rgb_desc(1, 1), qoi_test::flat_image(1, 1, 3, {0, 0, 0}), {0xC0});
+}
 
-TEST(Golden, RunLength2) { check_golden(rgb_desc(2, 1), repeat_rgb(2, 0, 0, 0), {0xC1}); }
+TEST(Golden, RunLength2) {
+    check_golden(rgb_desc(2, 1), qoi_test::flat_image(2, 1, 3, {0, 0, 0}), {0xC1});
+}
 
 // 61 pixels: the counter reaches 61 at the last pixel -> C0|60 = FC.
-TEST(Golden, RunLength61) { check_golden(rgb_desc(61, 1), repeat_rgb(61, 0, 0, 0), {0xFC}); }
+TEST(Golden, RunLength61) {
+    check_golden(rgb_desc(61, 1), qoi_test::flat_image(61, 1, 3, {0, 0, 0}), {0xFC});
+}
 
 // 62 pixels: the counter reaches 62 (also the last pixel; one push only) -> FD.
-TEST(Golden, RunLength62) { check_golden(rgb_desc(62, 1), repeat_rgb(62, 0, 0, 0), {0xFD}); }
+TEST(Golden, RunLength62) {
+    check_golden(rgb_desc(62, 1), qoi_test::flat_image(62, 1, 3, {0, 0, 0}), {0xFD});
+}
 
 // 63 pixels: flush at 62 -> FD, the 63rd pixel starts a new run of 1, flushed at the
 // last pixel -> C0. Shaped 7x9 to exercise a non-trivial width/height as well.
 TEST(Golden, RunLength63) {
-    check_golden(rgb_desc(63, 1), repeat_rgb(63, 0, 0, 0), {0xFD, 0xC0});
-    check_golden(rgb_desc(7, 9), repeat_rgb(63, 0, 0, 0), {0xFD, 0xC0});
+    check_golden(rgb_desc(63, 1), qoi_test::flat_image(63, 1, 3, {0, 0, 0}), {0xFD, 0xC0});
+    check_golden(rgb_desc(7, 9), qoi_test::flat_image(63, 1, 3, {0, 0, 0}), {0xFD, 0xC0});
 }
 
 // 124 = 2 * 62 pixels: two flushes at 62, the second coincides with the last pixel.
 TEST(Golden, RunLength124) {
-    check_golden(rgb_desc(124, 1), repeat_rgb(124, 0, 0, 0), {0xFD, 0xFD});
+    check_golden(rgb_desc(124, 1), qoi_test::flat_image(124, 1, 3, {0, 0, 0}), {0xFD, 0xFD});
 }
 
 // 125 pixels: FD, FD, then a run of 1 at the last pixel.
 TEST(Golden, RunLength125) {
-    check_golden(rgb_desc(125, 1), repeat_rgb(125, 0, 0, 0), {0xFD, 0xFD, 0xC0});
+    check_golden(rgb_desc(125, 1), qoi_test::flat_image(125, 1, 3, {0, 0, 0}), {0xFD, 0xFD, 0xC0});
 }
 
 // The same lengths with 4 channels (pixel (0,0,0,255) equals the initial previous one).
@@ -536,7 +529,8 @@ TEST(Golden, RunAfterCodedPixel) {
     check_golden(rgb_desc(3, 1), {10, 20, 30, 10, 20, 30, 10, 20, 30},
                  {0xFE, 0x0A, 0x14, 0x1E, 0xC1});
     // X followed by 62 repeats: the counter reaches 62 at the last pixel -> FD.
-    check_golden(rgb_desc(63, 1), repeat_rgb(63, 10, 20, 30), {0xFE, 0x0A, 0x14, 0x1E, 0xFD});
+    check_golden(rgb_desc(63, 1), qoi_test::flat_image(63, 1, 3, {10, 20, 30}),
+                 {0xFE, 0x0A, 0x14, 0x1E, 0xFD});
 }
 
 // Flush at 62 with a remainder run, then a different pixel. 1 + 63 copies of
@@ -545,7 +539,7 @@ TEST(Golden, RunAfterCodedPixel) {
 //   repeat starts a new run of 1, flushed when Y differs -> C0. Y is new, deltas
 //   (1,1,1) -> DIFF 0x7F.
 TEST(Golden, RunFlushAt62ThenRemainderRunThenNewPixel) {
-    Bytes pix = repeat_rgb(64, 10, 20, 30);
+    Bytes pix = qoi_test::flat_image(64, 1, 3, {10, 20, 30});
     pix.insert(pix.end(), {11, 21, 31});
     check_golden(rgb_desc(65, 1), pix, {0xFE, 0x0A, 0x14, 0x1E, 0xFD, 0xC0, 0x7F});
 }
@@ -566,7 +560,7 @@ TEST(Golden, RunAfterIndexHit) {
 
 // Run at the final pixel of a 2D image: 3x2 image, flat (0,0,0) -> one run of 6 -> C5.
 TEST(Golden, RunEndingAtFinalPixel2D) {
-    check_golden(rgb_desc(3, 2), repeat_rgb(6, 0, 0, 0), {0xC5});
+    check_golden(rgb_desc(3, 2), qoi_test::flat_image(6, 1, 3, {0, 0, 0}), {0xC5});
 }
 
 // ---------------------------------------------------------------------------

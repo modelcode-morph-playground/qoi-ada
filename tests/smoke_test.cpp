@@ -7,22 +7,14 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <vector>
 
 #include <gtest/gtest.h>
 
+#include "test_util.hpp"
+
 namespace {
 
-using Bytes = std::vector<std::uint8_t>;
-
-// The 14 header bytes for a 1x1 image with the given channel count and
-// colorspace byte: magic "qoif", width BE, height BE, channels, colorspace.
-Bytes header_1x1(std::uint8_t channels, std::uint8_t colorspace) {
-    return {0x71,     0x6F,      0x69, 0x66,  // "qoif"
-            0x00,     0x00,      0x00, 0x01,  // width = 1
-            0x00,     0x00,      0x00, 0x01,  // height = 1
-            channels, colorspace};
-}
+using qoi_test::Bytes;
 
 }  // namespace
 
@@ -47,25 +39,22 @@ TEST(Smoke, EncodeSingleRgbPixelProducesHeaderRgbChunkAndPadding) {
     ASSERT_EQ(n, 26u);
     ASSERT_LE(n, out.size());
 
-    const Bytes expected_header = header_1x1(3, 0);
+    const Bytes expected_header = qoi_test::header(1, 1, 3, 0);
     ASSERT_EQ(expected_header.size(), qoi::QOI_HEADER_SIZE);
-    for (std::size_t i = 0; i < expected_header.size(); ++i) {
-        EXPECT_EQ(out[i], expected_header[i]) << "header byte " << i;
-    }
+    EXPECT_TRUE(qoi_test::BytesEqual(expected_header, out, expected_header.size()));
 
     const Bytes expected_chunk = {0xFE, 0x0A, 0x14, 0x1E};
-    for (std::size_t i = 0; i < expected_chunk.size(); ++i) {
-        EXPECT_EQ(out[qoi::QOI_HEADER_SIZE + i], expected_chunk[i]) << "chunk byte " << i;
-    }
+    EXPECT_TRUE(qoi_test::BytesEqual(expected_chunk.data(), expected_chunk.size(),
+                                     out.data() + qoi::QOI_HEADER_SIZE, expected_chunk.size()));
 
-    const Bytes expected_padding = {0, 0, 0, 0, 0, 0, 0, 1};
+    const Bytes expected_padding = qoi_test::padding();
     ASSERT_EQ(expected_padding.size(), qoi::QOI_PADDING.size());
-    for (std::size_t i = 0; i < expected_padding.size(); ++i) {
-        EXPECT_EQ(out[n - expected_padding.size() + i], expected_padding[i])
-            << "padding byte " << i;
-        EXPECT_EQ(out[n - expected_padding.size() + i], qoi::QOI_PADDING[i])
-            << "padding byte " << i;
-    }
+    EXPECT_TRUE(qoi_test::BytesEqual(expected_padding.data(), expected_padding.size(),
+                                     out.data() + n - expected_padding.size(),
+                                     expected_padding.size()));
+    EXPECT_TRUE(qoi_test::BytesEqual(qoi::QOI_PADDING.data(), qoi::QOI_PADDING.size(),
+                                     out.data() + n - qoi::QOI_PADDING.size(),
+                                     qoi::QOI_PADDING.size()));
 }
 
 // An RGBA pixel equal to the initial previous pixel (0,0,0,255) is a run of
@@ -85,16 +74,13 @@ TEST(Smoke, EncodeSingleRgbaPixelEqualToInitialPreviousIsRunOfOne) {
     ASSERT_EQ(n, 23u);
     ASSERT_LE(n, out.size());
 
-    const Bytes expected_header = header_1x1(4, 0);
-    for (std::size_t i = 0; i < expected_header.size(); ++i) {
-        EXPECT_EQ(out[i], expected_header[i]) << "header byte " << i;
-    }
+    const Bytes expected_header = qoi_test::header(1, 1, 4, 0);
+    EXPECT_TRUE(qoi_test::BytesEqual(expected_header, out, expected_header.size()));
 
     EXPECT_EQ(out[qoi::QOI_HEADER_SIZE], 0xC0);
 
-    const Bytes expected_padding = {0, 0, 0, 0, 0, 0, 0, 1};
-    for (std::size_t i = 0; i < expected_padding.size(); ++i) {
-        EXPECT_EQ(out[n - expected_padding.size() + i], expected_padding[i])
-            << "padding byte " << i;
-    }
+    const Bytes expected_padding = qoi_test::padding();
+    EXPECT_TRUE(qoi_test::BytesEqual(expected_padding.data(), expected_padding.size(),
+                                     out.data() + n - expected_padding.size(),
+                                     expected_padding.size()));
 }

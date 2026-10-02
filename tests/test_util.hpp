@@ -16,6 +16,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <initializer_list>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -25,6 +26,13 @@
 #include "bytes_util.hpp"
 
 namespace qoi_test {
+
+constexpr std::uint64_t kStorageLast = 0x7FFFFFFFFFFFFFFFULL;  // Storage_Count'Last
+constexpr std::uint64_t kMaxDim = 0x7FFFFFFFULL;               // Integer_32'Last
+
+// Brace lists of 64-bit values; avoids deduction trouble between uint64_t and
+// unsigned long long literals on platforms where they are distinct types.
+using U64List = std::initializer_list<std::uint64_t>;
 
 // header + chunks + padding.
 inline Bytes stream(std::uint32_t width, std::uint32_t height, std::uint8_t channels,

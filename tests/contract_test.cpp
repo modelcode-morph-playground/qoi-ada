@@ -47,22 +47,14 @@ using qoi_test::Bytes;
 using qoi_test::BytesEqual;
 using qoi_test::DescEq;
 using qoi_test::ExactBytes;
+using qoi_test::kMaxDim;
+using qoi_test::kStorageLast;
 using qoi_test::make_desc;
+using qoi_test::U64List;
 
 constexpr std::uint8_t kSentinel = 0x9D;
-constexpr std::uint64_t kStorageLast = 0x7FFFFFFFFFFFFFFFULL;
-constexpr std::uint64_t kMaxDim = 0x7FFFFFFFULL;
-
-using U64List = std::initializer_list<std::uint64_t>;
-
 // A valid 1x1 RGB image (10,20,30): header, RGB chunk, padding. 26 bytes.
 Bytes valid_stream_rgb() { return qoi_test::stream(1, 1, 3, 0, {0xFE, 0x0A, 0x14, 0x1E}); }
-
-// Header for arbitrary raw field values, followed by `tail_chunks` and the padding.
-Bytes raw_stream(std::uint32_t w, std::uint32_t h, std::uint8_t channels, std::uint8_t cs,
-                 const Bytes& chunks) {
-    return qoi_test::stream(w, h, channels, cs, chunks);
-}
 
 // Header, chunks, then an arbitrary 8-byte tail instead of the real padding.
 Bytes stream_with_tail(std::uint32_t w, std::uint32_t h, std::uint8_t channels, const Bytes& chunks,
@@ -425,9 +417,9 @@ TEST(ContractDecode, DataShorterThan22BytesReturnsZero) {
 // Exactly 22 bytes (header + padding, no chunks) is accepted: the whole image is the
 // initial pixel (0,0,0,255) because no chunk is ever read (p = 14 > Last_Chunk = 13).
 TEST(ContractDecode, TwentyTwoByteStreamDecodesToInitialPixel) {
-    expect_decodes_to(raw_stream(2, 2, 3, 0, {}), make_desc(2, 2, 3), Bytes(12, 0),
+    expect_decodes_to(qoi_test::stream(2, 2, 3, 0, {}), make_desc(2, 2, 3), Bytes(12, 0),
                       "RGB, no chunks");
-    expect_decodes_to(raw_stream(2, 2, 4, 1, {}),
+    expect_decodes_to(qoi_test::stream(2, 2, 4, 1, {}),
                       make_desc(2, 2, 4, qoi::Colorspace::SRGB_Linear_Alpha),
                       pixel_bytes({{0, 0, 0, 255}, {0, 0, 0, 255}, {0, 0, 0, 255}, {0, 0, 0, 255}}),
                       "RGBA, no chunks");
@@ -456,13 +448,13 @@ TEST(ContractDecode, BadMagicOrColorspaceReturnsZeroWithEmptyDescriptor) {
 // (design decision 4: follow the Ada order and leave Desc as get_desc produced it).
 TEST(ContractDecode, InvalidChannelsOrDimensionsKeepParsedDescriptor) {
     for (const unsigned channels : {0U, 1U, 2U, 5U, 6U, 255U}) {
-        expect_decode_fails(raw_stream(1, 1, qoi_test::u8(channels), 0, {0xC0}), 64,
+        expect_decode_fails(qoi_test::stream(1, 1, qoi_test::u8(channels), 0, {0xC0}), 64,
                             make_desc(1, 1, channels), "channels " + std::to_string(channels));
     }
-    expect_decode_fails(raw_stream(0, 1, 3, 0, {0xC0}), 64, make_desc(0, 1, 3), "width 0");
-    expect_decode_fails(raw_stream(1, 0, 3, 1, {0xC0}), 64,
+    expect_decode_fails(qoi_test::stream(0, 1, 3, 0, {0xC0}), 64, make_desc(0, 1, 3), "width 0");
+    expect_decode_fails(qoi_test::stream(1, 0, 3, 1, {0xC0}), 64,
                         make_desc(1, 0, 3, qoi::Colorspace::SRGB_Linear_Alpha), "height 0");
-    expect_decode_fails(raw_stream(0, 0, 4, 0, {0xC0}), 64, make_desc(0, 0, 4), "both zero");
+    expect_decode_fails(qoi_test::stream(0, 0, 4, 0, {0xC0}), 64, make_desc(0, 0, 4), "both zero");
 }
 
 // Dimensions whose product overflows or exceeds any real buffer: the call fails by
@@ -475,8 +467,8 @@ TEST(ContractDecode, HugeDimensionsReturnZeroWithoutAllocating) {
     };
     for (const auto& c : cases) {
         const qoi::Desc expected = make_desc(c[0], c[1], c[2]);
-        expect_decode_fails(raw_stream(c[0], c[1], qoi_test::u8(c[2]), 0, {0xC0}), 64, expected,
-                            "huge " + std::to_string(c[0]) + "x" + std::to_string(c[1]));
+        expect_decode_fails(qoi_test::stream(c[0], c[1], qoi_test::u8(c[2]), 0, {0xC0}), 64,
+                            expected, "huge " + std::to_string(c[0]) + "x" + std::to_string(c[1]));
     }
 }
 
@@ -539,7 +531,7 @@ TEST(ContractDecode, ReturnsImageSizeNotStreamSize) {
 // store index[hash(0,0,0,255) = 53] := (0,0,0,255). [35] is INDEX 53 = 0x35 and so yields
 // (0,0,0,255). Without the refresh the slot would still be (0,0,0,0) and the alpha would be 0.
 TEST(ContractDecode, IndexIsRefreshedAfterRunChunk) {
-    expect_decodes_to(raw_stream(2, 1, 4, 0, {0xC0, 0x35}), make_desc(2, 1, 4),
+    expect_decodes_to(qoi_test::stream(2, 1, 4, 0, {0xC0, 0x35}), make_desc(2, 1, 4),
                       pixel_bytes({{0, 0, 0, 255}, {0, 0, 0, 255}}), "RUN then INDEX 53");
 }
 
@@ -547,13 +539,14 @@ TEST(ContractDecode, IndexIsRefreshedAfterRunChunk) {
 // 4 channels, 2x1: [FE 0A 14 1E] -> (10,20,30,255) stored in slot 9; [01] = INDEX 1, slot 1 is
 // empty -> (0,0,0,0).
 TEST(ContractDecode, IndexOfEmptySlotYieldsTransparentBlack) {
-    expect_decodes_to(raw_stream(2, 1, 4, 0, {0xFE, 0x0A, 0x14, 0x1E, 0x01}), make_desc(2, 1, 4),
-                      pixel_bytes({{10, 20, 30, 255}, {0, 0, 0, 0}}), "INDEX 1 on empty slot");
+    expect_decodes_to(qoi_test::stream(2, 1, 4, 0, {0xFE, 0x0A, 0x14, 0x1E, 0x01}),
+                      make_desc(2, 1, 4), pixel_bytes({{10, 20, 30, 255}, {0, 0, 0, 0}}),
+                      "INDEX 1 on empty slot");
     // INDEX 0 as the very first chunk, 1x1: slot 0 is (0,0,0,0).
-    expect_decodes_to(raw_stream(1, 1, 4, 0, {0x00}), make_desc(1, 1, 4),
+    expect_decodes_to(qoi_test::stream(1, 1, 4, 0, {0x00}), make_desc(1, 1, 4),
                       pixel_bytes({{0, 0, 0, 0}}), "INDEX 0 first");
     // With 3 channels the colour is (0,0,0) (alpha is not output).
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0x00}), make_desc(1, 1, 3), Bytes{0, 0, 0},
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0x00}), make_desc(1, 1, 3), Bytes{0, 0, 0},
                       "INDEX 0 first, RGB");
 }
 
@@ -561,7 +554,7 @@ TEST(ContractDecode, IndexOfEmptySlotYieldsTransparentBlack) {
 // [FE 28 32 3C] -> (40,50,60), slot hash(40,50,60,255) = 11; [09] -> slot 9 = (10,20,30).
 TEST(ContractDecode, IndexHitRestoresEarlierPixel) {
     expect_decodes_to(
-        raw_stream(3, 1, 3, 0, {0xFE, 0x0A, 0x14, 0x1E, 0xFE, 0x28, 0x32, 0x3C, 0x09}),
+        qoi_test::stream(3, 1, 3, 0, {0xFE, 0x0A, 0x14, 0x1E, 0xFE, 0x28, 0x32, 0x3C, 0x09}),
         make_desc(3, 1, 3), Bytes{10, 20, 30, 40, 50, 60, 10, 20, 30}, "INDEX 9");
 }
 
@@ -571,7 +564,7 @@ TEST(ContractDecode, IndexHitRestoresEarlierPixel) {
 // [14] = INDEX 20 -> the same pixel again. With the 3-channel hash (alpha 255) it would sit in
 // slot 9 and INDEX 20 would be empty, giving (0,0,0).
 TEST(ContractDecode, RgbaChunkInThreeChannelStreamStillUpdatesAlphaState) {
-    expect_decodes_to(raw_stream(2, 1, 3, 0, {0xFF, 0x0A, 0x14, 0x1E, 0x80, 0x14}),
+    expect_decodes_to(qoi_test::stream(2, 1, 3, 0, {0xFF, 0x0A, 0x14, 0x1E, 0x80, 0x14}),
                       make_desc(2, 1, 3), Bytes{10, 20, 30, 10, 20, 30}, "RGBA chunk, RGB output");
 }
 
@@ -580,11 +573,11 @@ TEST(ContractDecode, RgbaChunkInThreeChannelStreamStillUpdatesAlphaState) {
 // [6A] = DIFF 0,0,0 (01 10 10 10) -> (9,9,9,64).
 TEST(ContractDecode, RgbDiffLumaKeepAlpha) {
     expect_decodes_to(
-        raw_stream(3, 1, 4, 0, {0xFF, 0x01, 0x02, 0x03, 0x40, 0xFE, 0x09, 0x09, 0x09, 0x6A}),
+        qoi_test::stream(3, 1, 4, 0, {0xFF, 0x01, 0x02, 0x03, 0x40, 0xFE, 0x09, 0x09, 0x09, 0x6A}),
         make_desc(3, 1, 4), pixel_bytes({{1, 2, 3, 64}, {9, 9, 9, 64}, {9, 9, 9, 64}}),
         "alpha kept");
     // LUMA with dg = 0 and both relative nibbles 8 (no change): [A0 88].
-    expect_decodes_to(raw_stream(2, 1, 4, 0, {0xFF, 0x01, 0x02, 0x03, 0x40, 0xA0, 0x88}),
+    expect_decodes_to(qoi_test::stream(2, 1, 4, 0, {0xFF, 0x01, 0x02, 0x03, 0x40, 0xA0, 0x88}),
                       make_desc(2, 1, 4), pixel_bytes({{1, 2, 3, 64}, {1, 2, 3, 64}}),
                       "LUMA no-op keeps alpha");
 }
@@ -593,22 +586,22 @@ TEST(ContractDecode, RgbDiffLumaKeepAlpha) {
 // [4A] = 01 00 10 10 = (-2,0,0) from (0,0,0) -> (254,0,0).
 // [FE FF FF FF][7F]: (255,255,255) then (+1,+1,+1) -> (0,0,0).
 TEST(ContractDecode, DiffWrapsModulo256) {
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0x4A}), make_desc(1, 1, 3), Bytes{254, 0, 0},
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0x4A}), make_desc(1, 1, 3), Bytes{254, 0, 0},
                       "DIFF below 0");
-    expect_decodes_to(raw_stream(2, 1, 3, 0, {0xFE, 0xFF, 0xFF, 0xFF, 0x7F}), make_desc(2, 1, 3),
-                      Bytes{255, 255, 255, 0, 0, 0}, "DIFF above 255");
+    expect_decodes_to(qoi_test::stream(2, 1, 3, 0, {0xFE, 0xFF, 0xFF, 0xFF, 0x7F}),
+                      make_desc(2, 1, 3), Bytes{255, 255, 255, 0, 0, 0}, "DIFF above 255");
     // The extreme DIFF values from (0,0,0): 0x40 = (-2,-2,-2) -> (254,254,254).
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0x40}), make_desc(1, 1, 3), Bytes{254, 254, 254},
-                      "DIFF -2,-2,-2");
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0x40}), make_desc(1, 1, 3),
+                      Bytes{254, 254, 254}, "DIFF -2,-2,-2");
 }
 
 // LUMA wraps modulo 256.
 // [FE FA 64 FA] -> (250,100,250); [A0 FF] = dg 0, dr-dg +7, db-dg +7 -> (257,100,257) = (1,100,1).
 // [FE 05 05 05] -> (5,5,5); [80 88] = dg -32, relative 0 -> (-27,-27,-27) = (229,229,229).
 TEST(ContractDecode, LumaWrapsModulo256) {
-    expect_decodes_to(raw_stream(2, 1, 3, 0, {0xFE, 0xFA, 0x64, 0xFA, 0xA0, 0xFF}),
+    expect_decodes_to(qoi_test::stream(2, 1, 3, 0, {0xFE, 0xFA, 0x64, 0xFA, 0xA0, 0xFF}),
                       make_desc(2, 1, 3), Bytes{250, 100, 250, 1, 100, 1}, "LUMA above 255");
-    expect_decodes_to(raw_stream(2, 1, 3, 0, {0xFE, 0x05, 0x05, 0x05, 0x80, 0x88}),
+    expect_decodes_to(qoi_test::stream(2, 1, 3, 0, {0xFE, 0x05, 0x05, 0x05, 0x80, 0x88}),
                       make_desc(2, 1, 3), Bytes{5, 5, 5, 229, 229, 229}, "LUMA below 0");
 }
 
@@ -625,28 +618,29 @@ TEST(ContractDecode, RunChunkLengths) {
             expected.insert(expected.end(), {0, 0, 0, 255});
         }
         expected.insert(expected.end(), {10, 20, 30, 255});
-        expect_decodes_to(raw_stream(static_cast<std::uint32_t>(length + 1), 1, 4, 0, chunks),
+        expect_decodes_to(qoi_test::stream(static_cast<std::uint32_t>(length + 1), 1, 4, 0, chunks),
                           make_desc(length + 1, 1, 4), expected,
                           "run field " + std::to_string(field));
     }
     // 0xFE and 0xFF are not runs of length 63 and 64: they are RGB and RGBA.
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0xFE, 1, 2, 3}), make_desc(1, 1, 3), Bytes{1, 2, 3},
-                      "FE is RGB");
-    expect_decodes_to(raw_stream(1, 1, 4, 0, {0xFF, 1, 2, 3, 4}), make_desc(1, 1, 4),
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0xFE, 1, 2, 3}), make_desc(1, 1, 3),
+                      Bytes{1, 2, 3}, "FE is RGB");
+    expect_decodes_to(qoi_test::stream(1, 1, 4, 0, {0xFF, 1, 2, 3, 4}), make_desc(1, 1, 4),
                       Bytes{1, 2, 3, 4}, "FF is RGBA");
 }
 
 // A run longer than the image just ends with the image. 1x2 image, [FD] (62 pixels).
 TEST(ContractDecode, RunLongerThanImageIsTruncated) {
-    expect_decodes_to(raw_stream(1, 2, 3, 0, {0xFD}), make_desc(1, 2, 3), Bytes(6, 0),
+    expect_decodes_to(qoi_test::stream(1, 2, 3, 0, {0xFD}), make_desc(1, 2, 3), Bytes(6, 0),
                       "run 62 in 2 pixels");
 }
 
 // A run carries across and is consumed before the next chunk is read: [C1 FE 01 02 03] with
 // 4 pixels is (0,0,0) x2 then (1,2,3) then, no chunk left (S-9 reached), (1,2,3) repeats.
 TEST(ContractDecode, RunThenChunkThenRepeatAfterLastChunk) {
-    expect_decodes_to(raw_stream(4, 1, 3, 0, {0xC1, 0xFE, 0x01, 0x02, 0x03}), make_desc(4, 1, 3),
-                      Bytes{0, 0, 0, 0, 0, 0, 1, 2, 3, 1, 2, 3}, "run, RGB, repeat");
+    expect_decodes_to(qoi_test::stream(4, 1, 3, 0, {0xC1, 0xFE, 0x01, 0x02, 0x03}),
+                      make_desc(4, 1, 3), Bytes{0, 0, 0, 0, 0, 0, 1, 2, 3, 1, 2, 3},
+                      "run, RGB, repeat");
 }
 
 // Pixels beyond the last chunk repeat the previous pixel (Ada: no chunk is read when
@@ -663,8 +657,8 @@ TEST(ContractDecode, PixelsBeyondLastChunkRepeatPreviousPixel) {
     for (std::size_t i = 0; i < 1000; ++i) {
         expected.insert(expected.end(), {10, 20, 30});
     }
-    expect_decodes_to(raw_stream(1000, 1, 3, 0, {0xFE, 0x0A, 0x14, 0x1E}), make_desc(1000, 1, 3),
-                      expected, "1000 pixels from one chunk");
+    expect_decodes_to(qoi_test::stream(1000, 1, 3, 0, {0xFE, 0x0A, 0x14, 0x1E}),
+                      make_desc(1000, 1, 3), expected, "1000 pixels from one chunk");
 }
 
 // Boundary of Last_Chunk: a chunk whose first byte is at S-9 is read, one at S-8 is not.
@@ -686,15 +680,15 @@ TEST(ContractDecode, ChunkStartingAtLastChunkOffsetMayConsumePadding) {
         stream_with_tail(1, 1, 3, {0xFE}, Bytes{0x0A, 0x14, 0x1E, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}),
         make_desc(1, 1, 3), Bytes{10, 20, 30}, "RGB straddling the padding");
     // With the regular padding the operands are zero.
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0xFE}), make_desc(1, 1, 3), Bytes{0, 0, 0},
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0xFE}), make_desc(1, 1, 3), Bytes{0, 0, 0},
                       "RGB straddling the regular padding");
     // RGBA: four operands from the tail.
     expect_decodes_to(stream_with_tail(1, 1, 4, {0xFF}, Bytes{1, 2, 3, 4, 9, 9, 9, 9}),
                       make_desc(1, 1, 4), Bytes{1, 2, 3, 4}, "RGBA straddling the padding");
     // LUMA: the second byte comes from the tail. dg = -32 ([80]) and tail byte 00 (relative -8,
     // -8): r = 0 - 32 - 8 = -40 = 216, g = -32 = 224, b = 216.
-    expect_decodes_to(raw_stream(1, 1, 3, 0, {0x80}), make_desc(1, 1, 3), Bytes{216, 224, 216},
-                      "LUMA straddling the padding");
+    expect_decodes_to(qoi_test::stream(1, 1, 3, 0, {0x80}), make_desc(1, 1, 3),
+                      Bytes{216, 224, 216}, "LUMA straddling the padding");
     // Same chunk with a tail byte of 0x88 (relative 0, 0): (-32,-32,-32) = (224,224,224).
     expect_decodes_to(stream_with_tail(1, 1, 3, {0x80}, Bytes{0x88, 0, 0, 0, 0, 0, 0, 1}),
                       make_desc(1, 1, 3), Bytes{224, 224, 224}, "LUMA straddling a custom tail");
@@ -811,7 +805,7 @@ TEST(RobustnessDecode, RandomChunkBytesBehindValidHeader) {
         for (std::uint8_t& b : chunks) {
             b = rng.byte();
         }
-        const Bytes data = raw_stream(w, h, channels, qoi_test::u8(rng.below(2U)), chunks);
+        const Bytes data = qoi_test::stream(w, h, channels, qoi_test::u8(rng.below(2U)), chunks);
         const ExactBytes exact(data);
         const std::size_t need = static_cast<std::size_t>(w) * h * channels;
         Bytes out(need + 16, kSentinel);
@@ -901,8 +895,8 @@ TEST(RobustnessDecode, EveryOpcodeByteAsFirstChunk) {
     for (const std::uint8_t channels : {std::uint8_t{3}, std::uint8_t{4}}) {
         for (unsigned op = 0; op < 256; ++op) {
             for (const unsigned operand : {0U, 0x88U, 0xFFU}) {
-                const Bytes data = raw_stream(2, 1, channels, 0,
-                                              {qoi_test::u8(op), qoi_test::u8(operand), 1, 2, 3});
+                const Bytes data = qoi_test::stream(
+                    2, 1, channels, 0, {qoi_test::u8(op), qoi_test::u8(operand), 1, 2, 3});
                 const ExactBytes exact(data);
                 const std::size_t need = 2U * channels;
                 Bytes out(need + 8, kSentinel);
@@ -922,7 +916,7 @@ TEST(RobustnessDecode, LargeImageFromHeaderOnlyStream) {
     const std::size_t w = 1000;
     const std::size_t h = 1000;
     const Bytes data =
-        raw_stream(static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h), 4, 0, {});
+        qoi_test::stream(static_cast<std::uint32_t>(w), static_cast<std::uint32_t>(h), 4, 0, {});
     const ExactBytes exact(data);
     Bytes out(w * h * 4);
     qoi::Desc desc;
