@@ -3,6 +3,8 @@ legacy/ada/obj/
 legacy/ada/lib/
 legacy/ada/alire/
 legacy/ada/config/
+tests/ada/obj/
+tests/ada/qoi_driver
 
 # CMake / build output
 build/
