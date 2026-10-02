@@ -1,10 +1,12 @@
 // Shared helpers for the codec verification suite (golden, round trip and
-// contract tests): byte-vector builders, a deterministic random source, image
-// generators and comparison helpers with readable failure output.
+// contract tests): stream builders, image generators and gtest comparison
+// helpers with readable failure output. The byte-level building blocks (Bytes,
+// header(), padding(), hex(), Rng) live in bytes_util.hpp.
 //
-// Nothing here calls the codec to build an expectation: the header and padding
-// builders are written out byte by byte from the QOI format specification so
-// that the golden vectors stay independent of the code under test.
+// The image generators here are deliberately separate from the ones in
+// diff_util.hpp: these target codec coverage (runs past the 62 flush limit,
+// INDEX hits, gradients), those are tuned to hit the Ada vs qoi.h wrap-around
+// decision. Merging them would silently change both random corpora.
 #ifndef QOI_TESTS_TEST_UTIL_HPP
 #define QOI_TESTS_TEST_UTIL_HPP
 
@@ -14,52 +16,16 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <initializer_list>
 #include <memory>
-#include <random>
 #include <sstream>
 #include <string>
 #include <vector>
 
 #include <gtest/gtest.h>
 
+#include "bytes_util.hpp"
+
 namespace qoi_test {
-
-using Bytes = std::vector<std::uint8_t>;
-
-// Truncating conversion to one byte (modulo 256), usable with int and unsigned
-// arguments without tripping -Wconversion.
-template <typename T> constexpr std::uint8_t u8(T value) noexcept {
-    return static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xFFU);
-}
-
-// ---------------------------------------------------------------------------
-// Byte stream builders (written from the QOI specification)
-// ---------------------------------------------------------------------------
-
-// Big-endian encoding of a 32-bit value.
-inline Bytes be32(std::uint32_t value) {
-    return {u8(value >> 24), u8(value >> 16), u8(value >> 8), u8(value)};
-}
-
-inline Bytes concat(std::initializer_list<Bytes> parts) {
-    Bytes result;
-    for (const Bytes& part : parts) {
-        result.insert(result.end(), part.begin(), part.end());
-    }
-    return result;
-}
-
-// The 14-byte QOI header: magic "qoif", width BE, height BE, channels,
-// colorspace byte.
-inline Bytes header(std::uint32_t width, std::uint32_t height, std::uint8_t channels,
-                    std::uint8_t colorspace) {
-    return concat(
-        {Bytes{0x71, 0x6F, 0x69, 0x66}, be32(width), be32(height), Bytes{channels, colorspace}});
-}
-
-// The 8-byte end marker: seven zero bytes and a one.
-inline Bytes padding() { return Bytes{0, 0, 0, 0, 0, 0, 0, 1}; }
 
 // header + chunks + padding.
 inline Bytes stream(std::uint32_t width, std::uint32_t height, std::uint8_t channels,
@@ -101,41 +67,13 @@ inline qoi::Colorspace colorspace_of(std::size_t index) {
 // Comparison helpers with readable output
 // ---------------------------------------------------------------------------
 
-inline std::string hex(const std::uint8_t* data, std::size_t size, std::size_t max_bytes = 96) {
-    static const char digits[] = "0123456789ABCDEF";
-    std::string text;
-    const std::size_t shown = std::min(size, max_bytes);
-    for (std::size_t i = 0; i < shown; ++i) {
-        if (i != 0) {
-            text += ' ';
-        }
-        text += digits[(data[i] >> 4) & 0x0F];
-        text += digits[data[i] & 0x0F];
-    }
-    if (shown < size) {
-        text += " ... (" + std::to_string(size - shown) + " more)";
-    }
-    return text;
-}
-
-inline std::string hex(const Bytes& bytes, std::size_t max_bytes = 96) {
-    return hex(bytes.data(), bytes.size(), max_bytes);
-}
-
 // Compares two byte sequences; on mismatch reports both lengths, the first
 // differing offset and a hex dump window around it.
 inline ::testing::AssertionResult BytesEqual(const std::uint8_t* expected,
                                              std::size_t expected_size, const std::uint8_t* actual,
                                              std::size_t actual_size) {
-    const std::size_t common = std::min(expected_size, actual_size);
-    std::size_t first_diff = common;
-    for (std::size_t i = 0; i < common; ++i) {
-        if (expected[i] != actual[i]) {
-            first_diff = i;
-            break;
-        }
-    }
-    if (first_diff == common && expected_size == actual_size) {
+    const std::size_t first_diff = first_mismatch(expected, expected_size, actual, actual_size);
+    if (first_diff == expected_size && expected_size == actual_size) {
         return ::testing::AssertionSuccess();
     }
 
@@ -214,27 +152,6 @@ public:
 private:
     std::size_t size_;
     std::unique_ptr<std::uint8_t[]> data_;
-};
-
-// ---------------------------------------------------------------------------
-// Deterministic random source
-//
-// std::mt19937 output is fully specified by the standard, so sequences are
-// identical on every platform. std::uniform_int_distribution is NOT used, its
-// results are implementation-defined; bytes and bounded values are derived with
-// masks and the modulo operator instead.
-// ---------------------------------------------------------------------------
-class Rng {
-public:
-    explicit Rng(std::uint32_t seed) : engine_(seed) {}
-
-    std::uint32_t next() { return static_cast<std::uint32_t>(engine_()); }
-    std::uint8_t byte() { return u8(next() & 0xFFU); }
-    // Value in [0, bound). The modulo bias is irrelevant for test data.
-    std::uint32_t below(std::uint32_t bound) { return next() % bound; }
-
-private:
-    std::mt19937 engine_;
 };
 
 // ---------------------------------------------------------------------------

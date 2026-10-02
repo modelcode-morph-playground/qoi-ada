@@ -3,6 +3,12 @@
 // crafted known-clean / known-wrapping inputs, and the independent wrap-around
 // delta classifier.
 //
+// The low-level byte helpers (Bytes, header and padding builders, hex, RNG
+// primitives) come from bytes_util.hpp. The image generators below are
+// deliberately separate from the ones in test_util.hpp: they are tuned (extreme
+// values, mod-256 walks, +-2 steps, short runs) to hit the Ada vs qoi.h
+// wrap-around decision.
+//
 // Everything here is deterministic: generators take a caller-owned
 // std::mt19937 and draw bytes with `rng() & 0xFF` (not a distribution object),
 // so the same seed yields the same inputs with every standard library.
@@ -17,22 +23,21 @@
 #include <string>
 #include <vector>
 
+#include "bytes_util.hpp"
 #include "qoi/qoi.hpp"
 
 namespace difftest {
 
-using Bytes = std::vector<std::uint8_t>;
+using Bytes = qoi_test::Bytes;
 
 // ---------------------------------------------------------------------------
 // Random helpers
 // ---------------------------------------------------------------------------
-inline std::uint8_t next_byte(std::mt19937& rng) {
-    return static_cast<std::uint8_t>(rng() & 0xFFU);
-}
+inline std::uint8_t next_byte(std::mt19937& rng) { return qoi_test::rng_byte(rng); }
 
 // Value in [0, n). The modulo bias is irrelevant here; n must be > 0.
 inline std::uint32_t below(std::mt19937& rng, std::uint32_t n) {
-    return static_cast<std::uint32_t>(rng() % n);
+    return qoi_test::rng_below(rng, n);
 }
 
 inline bool chance(std::mt19937& rng, std::uint32_t one_in) { return below(rng, one_in) == 0; }
@@ -105,24 +110,12 @@ inline Decoded ours_decode(const Bytes& data) {
 // Index of the first byte at which a and b differ, or min(size) if one is a
 // prefix of the other (a.size() == b.size() and no difference: returns size).
 inline std::size_t first_diff(const Bytes& a, const Bytes& b) {
-    const std::size_t n = std::min(a.size(), b.size());
-    for (std::size_t i = 0; i < n; ++i) {
-        if (a[i] != b[i]) {
-            return i;
-        }
-    }
-    return n;
+    return qoi_test::first_mismatch(a.data(), a.size(), b.data(), b.size());
 }
 
 inline std::string hex_at(const Bytes& b, std::size_t pos, std::size_t count = 6) {
-    static const char* const digits = "0123456789abcdef";
-    std::string s;
-    for (std::size_t i = pos; i < b.size() && i < pos + count; ++i) {
-        s += digits[b[i] >> 4];
-        s += digits[b[i] & 0x0F];
-        s += ' ';
-    }
-    return s.empty() ? std::string("<end>") : s;
+    return pos >= b.size() ? std::string("<end>")
+                           : qoi_test::hex(b.data() + pos, b.size() - pos, count);
 }
 
 // ---------------------------------------------------------------------------
@@ -603,22 +596,13 @@ inline const std::array<Size, 18>& image_sizes() {
 // Random / structured QOI streams for decoder differentials
 // ---------------------------------------------------------------------------
 inline Bytes make_header(std::uint32_t w, std::uint32_t h, unsigned channels, unsigned colorspace) {
-    Bytes b = {'q', 'o', 'i', 'f'};
-    for (std::uint32_t v : {w, h}) {
-        b.push_back(static_cast<std::uint8_t>(v >> 24));
-        b.push_back(static_cast<std::uint8_t>((v >> 16) & 0xFFU));
-        b.push_back(static_cast<std::uint8_t>((v >> 8) & 0xFFU));
-        b.push_back(static_cast<std::uint8_t>(v & 0xFFU));
-    }
-    b.push_back(static_cast<std::uint8_t>(channels));
-    b.push_back(static_cast<std::uint8_t>(colorspace));
-    return b;
+    return qoi_test::header(w, h, static_cast<std::uint8_t>(channels),
+                            static_cast<std::uint8_t>(colorspace));
 }
 
 inline void append_padding(Bytes& b) {
-    for (const std::uint8_t p : qoi::QOI_PADDING) {
-        b.push_back(p);
-    }
+    const Bytes p = qoi_test::padding();
+    b.insert(b.end(), p.begin(), p.end());
 }
 
 // A QOI stream with valid header fields and arbitrary chunk bytes, padding that
