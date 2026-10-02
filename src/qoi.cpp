@@ -46,7 +46,6 @@ struct Color {
     constexpr bool operator==(const Color& other) const noexcept {
         return r == other.r && g == other.g && b == other.b && a == other.a;
     }
-    constexpr bool operator!=(const Color& other) const noexcept { return !(*this == other); }
 };
 
 // Hash of a pixel (Ada: Hash). Computed in 8-bit modular arithmetic, as with the
@@ -92,9 +91,10 @@ struct Deltas {
 // differences which are then range-tested by the caller (so 255 -> 0 is -255,
 // which selects RGB). The reference qoi.h instead stores the deltas in
 // `signed char`, which wraps (255 -> 0 is +1, selecting DIFF/LUMA). Switching to
-// that behaviour means changing ONLY this function: wrap vr, vg and vb to the
-// signed 8-bit range (e.g. static_cast<signed char>(...) of the difference) and
-// keep vg_r/vg_b derived from the wrapped values as in qoi.h.
+// that behaviour means changing ONLY this function: wrap all five values (vr, vg,
+// vb, vg_r and vg_b) to the signed 8-bit range, e.g. static_cast<signed char>(...)
+// of each difference. In qoi.h vg_r and vg_b are themselves signed char, so they
+// wrap a second time rather than being derived from the wrapped vr/vg/vb.
 Deltas compute_deltas(const Color& px, const Color& prev) noexcept {
     Deltas d{};
     d.vr = static_cast<int>(px.r) - static_cast<int>(prev.r);
