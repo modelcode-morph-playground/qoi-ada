@@ -10,8 +10,7 @@ Conventions:
   `contract_test.cpp`, `DifferentialRef.*` in `differential_ref_test.cpp`.
 - "see differential/fuzz" marks a row that is additionally covered by the differential tests
   (reference `qoi.h`, the Ada driver `qoi_ada_diff`) or by the decode fuzz target
-  (`tests/fuzz/decode_fuzz.cpp`, CTest `qoi_fuzz_corpus`). Those files are owned by the
-  differential/fuzz work and are only referenced here.
+  (`tests/fuzz/decode_fuzz.cpp`, CTest `qoi_fuzz_corpus`). Those files are only referenced here.
 - "Spec decision N" refers to the numbered items of the project spec (`PROJECT.md`); "design
   decision N" refers to the milestone design decisions.
 - C++ locations are function names in `src/qoi.cpp` (line numbers drift, so they are not
