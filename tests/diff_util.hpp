@@ -73,8 +73,9 @@ struct Decoded {
 // Decodes with qoi::get_desc + qoi::decode, sizing the output from the header.
 inline Decoded ours_decode(const Bytes& data) {
     Decoded r;
+    const qoi_test::ExactBytes exact(data);
     qoi::Desc desc;
-    qoi::get_desc(data, desc);
+    qoi::get_desc(exact.span(), desc);
     r.width = desc.width;
     r.height = desc.height;
     r.channels = desc.channels;
@@ -86,7 +87,7 @@ inline Decoded ours_decode(const Bytes& data) {
         // Invalid header: decode must fail whatever the buffer is.
         std::array<std::uint8_t, 4> tiny{};
         qoi::Desc d2;
-        r.ok = qoi::decode(data, d2, tiny) != 0;
+        r.ok = qoi::decode(exact.span(), d2, tiny) != 0;
         return r;
     }
     if (desc.width > kDecodeCapBytes / desc.height / desc.channels) {
@@ -97,7 +98,7 @@ inline Decoded ours_decode(const Bytes& data) {
     const std::size_t need = static_cast<std::size_t>(desc.width * desc.height * desc.channels);
     r.pixels.assign(need, 0);
     qoi::Desc d2;
-    const std::size_t n = qoi::decode(data, d2, r.pixels);
+    const std::size_t n = qoi::decode(exact.span(), d2, r.pixels);
     r.ok = n != 0;
     if (r.ok) {
         r.pixels.resize(n);

@@ -16,7 +16,6 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -129,30 +128,6 @@ inline bool all_equal(const Bytes& buffer, std::size_t begin, std::size_t end, s
     }
     return true;
 }
-
-// ---------------------------------------------------------------------------
-// Exact-size heap copies, so that sanitizers see every out-of-bounds access
-// ---------------------------------------------------------------------------
-
-// Owns a heap array of exactly `size` bytes (a new[] of that size, not a
-// vector with spare capacity). Zero-length copies are valid and non-null.
-class ExactBytes {
-public:
-    ExactBytes(const std::uint8_t* source, std::size_t size)
-        : size_(size), data_(new std::uint8_t[size]) {
-        std::copy(source, source + size, data_.get());
-    }
-
-    explicit ExactBytes(const Bytes& source) : ExactBytes(source.data(), source.size()) {}
-
-    [[nodiscard]] qoi::Span<const std::uint8_t> span() const noexcept {
-        return qoi::Span<const std::uint8_t>(data_.get(), size_);
-    }
-
-private:
-    std::size_t size_;
-    std::unique_ptr<std::uint8_t[]> data_;
-};
 
 // ---------------------------------------------------------------------------
 // Image generators. Images are tightly packed, row-major, `channels` bytes per

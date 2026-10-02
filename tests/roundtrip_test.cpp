@@ -86,15 +86,16 @@ Bytes check_round_trip(const qoi::Desc& desc, const Bytes& pix, const std::strin
         EXPECT_TRUE(BytesEqual(stream, again, m));
     }
 
+    const qoi_test::ExactBytes exact_stream(stream);
+
     // ---- get_desc ------------------------------------------------------------
     {
         qoi::Desc parsed = qoi_test::poisoned_desc();
-        qoi::get_desc(stream, parsed);
+        qoi::get_desc(exact_stream.span(), parsed);
         EXPECT_TRUE(DescEq(desc, parsed));
     }
 
     // ---- decode into an exact-size output buffer with guard bytes ------------
-    const qoi_test::ExactBytes exact_stream(stream);
     {
         Bytes out(pix.size() + kGuardSize, kGuard);
         qoi::Desc decoded = qoi_test::poisoned_desc();
@@ -112,7 +113,7 @@ Bytes check_round_trip(const qoi::Desc& desc, const Bytes& pix, const std::strin
         const std::size_t extra = 37;
         Bytes out(pix.size() + extra, kSurplus);
         qoi::Desc decoded = qoi_test::poisoned_desc();
-        const std::size_t size = qoi::decode(stream, decoded, out);
+        const std::size_t size = qoi::decode(exact_stream.span(), decoded, out);
         EXPECT_EQ(size, pix.size()) << "the return value is the image size, not the buffer size";
         EXPECT_TRUE(DescEq(desc, decoded));
         EXPECT_TRUE(BytesEqual(pix, out, pix.size()));
@@ -137,8 +138,8 @@ void quick_round_trip(const qoi::Desc& desc, const Bytes& pix) {
     ASSERT_LE(n, buffer.size());
     Bytes out(pix.size());
     qoi::Desc decoded = qoi_test::poisoned_desc();
-    const std::size_t size =
-        qoi::decode(qoi::Span<const std::uint8_t>(buffer.data(), n), decoded, out);
+    const qoi_test::ExactBytes exact_stream(buffer.data(), n);
+    const std::size_t size = qoi::decode(exact_stream.span(), decoded, out);
     ASSERT_EQ(size, pix.size()) << qoi_test::hex(pix);
     ASSERT_TRUE(DescEq(desc, decoded));
     ASSERT_TRUE(BytesEqual(pix, out)) << "stream: " << qoi_test::hex(buffer.data(), n);

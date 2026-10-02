@@ -1,6 +1,7 @@
 // Byte-level helpers shared by every test header: the Bytes alias, QOI stream
 // builders written from the format specification, hex formatting, the
-// first-difference search and the deterministic random source.
+// first-difference search, exact-size heap copies and the deterministic random
+// source.
 //
 // This header has no GoogleTest dependency, so tests/diff_util.hpp (also used by
 // the non-gtest qoi_ada_diff and fuzz targets) can include it as well as
@@ -16,9 +17,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
+#include <memory>
 #include <random>
 #include <string>
 #include <vector>
+
+#include "qoi/qoi.hpp"
 
 namespace qoi_test {
 
@@ -124,6 +128,30 @@ public:
 
 private:
     std::mt19937 engine_;
+};
+
+// ---------------------------------------------------------------------------
+// Exact-size heap copies, so that sanitizers see every out-of-bounds access
+// ---------------------------------------------------------------------------
+
+// Owns a heap array of exactly `size` bytes (a new[] of that size, not a
+// vector with spare capacity). Zero-length copies are valid and non-null.
+class ExactBytes {
+public:
+    ExactBytes(const std::uint8_t* source, std::size_t size)
+        : size_(size), data_(new std::uint8_t[size]) {
+        std::copy(source, source + size, data_.get());
+    }
+
+    explicit ExactBytes(const Bytes& source) : ExactBytes(source.data(), source.size()) {}
+
+    [[nodiscard]] qoi::Span<const std::uint8_t> span() const noexcept {
+        return qoi::Span<const std::uint8_t>(data_.get(), size_);
+    }
+
+private:
+    std::size_t size_;
+    std::unique_ptr<std::uint8_t[]> data_;
 };
 
 }  // namespace qoi_test

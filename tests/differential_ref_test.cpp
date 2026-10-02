@@ -455,7 +455,8 @@ TEST(DifferentialRef, DecoderRejectsHugeDimensionsLikeReference) {
             qoi_ref_desc rd{};
             EXPECT_EQ(qoi_ref_decode(s.data(), s.size(), 0, &rd, tiny, sizeof tiny), 0U);
             qoi::Desc od;
-            EXPECT_EQ(qoi::decode(s, od, tiny), 0U);
+            const qoi_test::ExactBytes exact(s);
+            EXPECT_EQ(qoi::decode(exact.span(), od, tiny), 0U);
         }
     }
 }

@@ -86,14 +86,15 @@ void check_golden(const qoi::Desc& desc, const Bytes& pix, const Bytes& chunks) 
         << "encoder wrote past the reported size";
 
     // The header alone is also visible through get_desc.
+    const qoi_test::ExactBytes exact_expected(expected);
     qoi::Desc parsed = qoi_test::poisoned_desc();
-    qoi::get_desc(expected, parsed);
+    qoi::get_desc(exact_expected.span(), parsed);
     EXPECT_TRUE(DescEq(desc, parsed));
 
     // Decode the golden bytes into an exact-size buffer and compare the pixels.
     Bytes decoded(pix.size(), 0x55);
     qoi::Desc decoded_desc = qoi_test::poisoned_desc();
-    const std::size_t decoded_size = qoi::decode(expected, decoded_desc, decoded);
+    const std::size_t decoded_size = qoi::decode(exact_expected.span(), decoded_desc, decoded);
     ASSERT_EQ(decoded_size, pix.size());
     EXPECT_TRUE(DescEq(desc, decoded_desc));
     EXPECT_TRUE(BytesEqual(pix, decoded));

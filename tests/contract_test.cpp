@@ -510,12 +510,12 @@ TEST(ContractDecode, OutputBufferSizeBoundary) {
 
 // The decoder ignores the descriptor it is given on entry, whatever it holds.
 TEST(ContractDecode, InputDescriptorIsIgnored) {
-    const Bytes stream = valid_stream_rgb();
+    const qoi_test::ExactBytes stream(valid_stream_rgb());
     for (const qoi::Desc& initial :
          {qoi_test::empty_desc(), qoi_test::poisoned_desc(), make_desc(9, 9, 4)}) {
         qoi::Desc desc = initial;
         Bytes out(3);
-        EXPECT_EQ(qoi::decode(stream, desc, out), 3u);
+        EXPECT_EQ(qoi::decode(stream.span(), desc, out), 3u);
         EXPECT_TRUE(DescEq(make_desc(1, 1, 3), desc));
         EXPECT_TRUE(BytesEqual(Bytes{10, 20, 30}, out));
     }
@@ -527,10 +527,11 @@ TEST(ContractDecode, InputDescriptorIsIgnored) {
 
 // Post: Output_Size = Width * Height * Channels.
 TEST(ContractDecode, ReturnsImageSizeNotStreamSize) {
-    const Bytes stream = qoi_test::stream(10, 10, 4, 0, {0xFD, 0xFC});  // two runs: 62 + 61 pixels
+    // two runs: 62 + 61 pixels
+    const qoi_test::ExactBytes stream(qoi_test::stream(10, 10, 4, 0, {0xFD, 0xFC}));
     Bytes out(400);
     qoi::Desc desc;
-    EXPECT_EQ(qoi::decode(stream, desc, out), 400u);
+    EXPECT_EQ(qoi::decode(stream.span(), desc, out), 400u);
 }
 
 // The index is refreshed after a RUN chunk too (Ada line 460: the store follows every chunk).
