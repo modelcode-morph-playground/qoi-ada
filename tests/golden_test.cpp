@@ -219,8 +219,8 @@ TEST(Golden, HeaderHeightIsBigEndian258) {
 // the last 2 pixels flush at the final pixel as run 2 -> C1.
 TEST(Golden, HeaderWidthThirdByte65536) {
     const Bytes pix = repeat_rgb(65536, 0, 0, 0);
-    Bytes chunks(1057, 0xFD);
-    chunks.push_back(0xC1);
+    Bytes chunks(1058, 0xFD);
+    chunks.back() = 0xC1;
     check_golden(rgb_desc(65536, 1), pix, chunks);
     EXPECT_EQ(qoi_test::header(65536, 1, 3, 0), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x01, 0x00,
                                                        0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x00}));
