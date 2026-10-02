@@ -1,7 +1,8 @@
-obj/
-lib/
-alire/
-config/
+# Ada reference implementation build output (Alire / GPRbuild)
+legacy/ada/obj/
+legacy/ada/lib/
+legacy/ada/alire/
+legacy/ada/config/
 
 # CMake / build output
 build/

@@ -1,7 +1,7 @@
 // Golden byte-vector tests.
 //
 // Every expected byte stream below was derived BY HAND from the QOI format
-// specification and by tracing src/qoi.adb (Encode, Decode). None of them was
+// specification and by tracing legacy/ada/src/qoi.adb (Encode, Decode). None of them was
 // produced by running the C++ encoder, so they are an independent oracle.
 //
 // Notation used in the derivations:
@@ -572,7 +572,7 @@ TEST(Golden, RunEndingAtFinalPixel2D) {
 // ---------------------------------------------------------------------------
 // WRAP-AROUND deltas (milestone design decision 6).
 //
-// The Ada encoder (src/qoi.adb lines 206-214) computes VR, VG and VB as UNBOUNDED
+// The Ada encoder (legacy/ada/src/qoi.adb lines 206-214) computes VR, VG and VB as UNBOUNDED
 // Integer differences and range-tests them, so a step 255 -> 0 is -255 and selects
 // RGB. The reference encoder qoi.h stores the deltas in `signed char`, which wraps:
 // 255 -> 0 is +1 and it emits DIFF (or LUMA). Both streams decode to the same pixels.
@@ -749,7 +749,7 @@ TEST(Golden, ValidSizeDimensionLimits) {
 
 // valid_size: overflow of w*h*(c+1)+22 beyond Storage_Count'Last = 2^63-1.
 //
-// Ada's Valid_Size is the conjunction (lines 105-113 of src/qoi.ads):
+// Ada's Valid_Size is the conjunction (lines 105-113 of legacy/ada/src/qoi.ads):
 //   (4) w <= LAST / h
 //   (5) (c+1) <= LAST / (w*h)
 //   (6) 22 <= LAST - w*h*(c+1)

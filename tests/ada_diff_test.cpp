@@ -1,7 +1,7 @@
 // C++ half of the optional Ada differential test (CTest test qoi_ada_diff).
 //
 // The test compares qoi::encode / qoi::decode with the ORIGINAL Ada package
-// (src/qoi.adb). Ada and C++ cannot be linked together, so the two halves talk
+// (legacy/ada/src/qoi.adb). Ada and C++ cannot be linked together, so the two halves talk
 // through a directory of files:
 //
 //   qoi_ada_diff gen <dir>      write test inputs and the C++ results

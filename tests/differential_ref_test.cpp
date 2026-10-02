@@ -2,7 +2,7 @@
 // (vendored under tests/third_party, reached through qoi_reference_wrapper.h).
 //
 // The two encoders agree except for one documented divergence (project spec,
-// decision 6): src/qoi.adb range-tests UNBOUNDED integer channel deltas, while
+// decision 6): legacy/ada/src/qoi.adb range-tests UNBOUNDED integer channel deltas, while
 // qoi.h stores them in `signed char`, which wraps. 255 -> 0 is -255 for the
 // Ada-identical C++ port (an RGB chunk) and +1 for qoi.h (a one-byte DIFF
 // chunk). Both streams are valid and decode to the same pixels.

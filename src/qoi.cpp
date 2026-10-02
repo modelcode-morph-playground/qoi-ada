@@ -1,7 +1,7 @@
-// QOI (Quite OK Image) codec, C++17 port of the Ada/SPARK body src/qoi.adb.
+// QOI (Quite OK Image) codec, C++17 port of the Ada/SPARK body legacy/ada/src/qoi.adb.
 //
 // The port mirrors the Ada body statement by statement. The Unchecked_Conversion
-// bit-field records of src/qoi.ads (Index_Tag, Diff_Tag, LUMA_Tag_A, LUMA_Tag_B,
+// bit-field records of legacy/ada/src/qoi.ads (Index_Tag, Diff_Tag, LUMA_Tag_A, LUMA_Tag_B,
 // Run_Tag) are replaced by explicit shift/mask code and named opcode constants.
 #include "qoi/qoi.hpp"
 
@@ -16,7 +16,7 @@ namespace {
 
 // ---------------------------------------------------------------------------
 // Opcode constants (QOI specification; Tag_Op, QOI_OP_RGB, QOI_OP_RGBA and
-// QOI_MAGIC in src/qoi.ads).
+// QOI_MAGIC in legacy/ada/src/qoi.ads).
 // ---------------------------------------------------------------------------
 constexpr std::uint8_t QOI_OP_INDEX = 0x00;
 constexpr std::uint8_t QOI_OP_DIFF = 0x40;

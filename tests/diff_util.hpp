@@ -132,7 +132,7 @@ inline std::string hex_at(const Bytes& b, std::size_t pos, std::size_t count = 6
 // a run repeat nor an INDEX hit and whose alpha equals the previous pixel's,
 // they choose between DIFF, LUMA and RGB from the per-channel deltas.
 //
-//   Ada (src/qoi.adb)       deltas are UNBOUNDED integers: 255 -> 0 is -255.
+//   Ada (legacy/ada/src/qoi.adb)       deltas are UNBOUNDED integers: 255 -> 0 is -255.
 //   reference (qoi.h)       deltas are `signed char`, which wraps modulo 256:
 //                           255 -> 0 is +1; vg_r and vg_b wrap again.
 //

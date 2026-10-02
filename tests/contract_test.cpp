@@ -1,6 +1,6 @@
 // Contract and robustness tests.
 //
-// The Ada specification (src/qoi.ads) states preconditions and postconditions that
+// The Ada specification (legacy/ada/src/qoi.ads) states preconditions and postconditions that
 // SPARK proves. The C++ port turns every violated precondition into a graceful `0`
 // return, so these tests pin down, per function, exactly what happens at and around
 // each boundary of those contracts, and what the decoder does with hostile input.
@@ -14,9 +14,9 @@
 //   * No test allocates anything large. Huge dimensions are only ever passed in
 //     descriptors or headers together with tiny buffers.
 //   * Expected decoder outputs for crafted streams are derived by hand from
-//     src/qoi.adb (lines 392-470); the derivation is in the comment of each test.
+//     legacy/ada/src/qoi.adb (lines 392-470); the derivation is in the comment of each test.
 //
-// Decoder facts used in the derivations (src/qoi.adb, Decode):
+// Decoder facts used in the derivations (legacy/ada/src/qoi.adb, Decode):
 //   - Last_Chunk = Data'Last - 8, so with the stream length S a chunk is read only
 //     while its first byte is at offset p <= S - 9. A chunk that starts at S-9 may
 //     run into the padding bytes (they are not verified). From offset S-8 on no

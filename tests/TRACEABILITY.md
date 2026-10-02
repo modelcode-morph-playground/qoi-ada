@@ -1,6 +1,6 @@
 # Traceability: Ada contract to C++ implementation to tests
 
-Every precondition, postcondition and failure path in `src/qoi.ads` and `src/qoi.adb` is listed
+Every precondition, postcondition and failure path in `legacy/ada/src/qoi.ads` and `legacy/ada/src/qoi.adb` is listed
 here with the place where `src/qoi.cpp` implements it and the tests that exercise it.
 
 Conventions:
