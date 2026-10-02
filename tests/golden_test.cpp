@@ -27,7 +27,6 @@
 // golden bytes, and the decoder must turn the golden bytes back into the pixels.
 #include <qoi/qoi.hpp>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>

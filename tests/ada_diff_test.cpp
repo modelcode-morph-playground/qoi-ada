@@ -44,7 +44,6 @@
 //   * Ada decodes the C++ encoder's output to the original pixels;
 //   * for random, truncated and corrupted streams Ada and C++ agree on
 //     accept/reject, header and pixels.
-#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
