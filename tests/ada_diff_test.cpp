@@ -48,6 +48,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <iterator>
 #include <random>
@@ -412,14 +413,14 @@ private:
             mismatch(e.id + ": the Ada driver wrote no encoder output");
             return;
         }
-        if (difftest::has_wraparound_delta(pix, e.channels)) {
+        const bool wraps = difftest::has_wraparound_delta(pix, e.channels);
+        if (wraps) {
             ++wrapping_;
         }
         if (ada != cpp) {
             const std::size_t at = difftest::first_diff(ada, cpp);
             mismatch(e.id + " (" + std::to_string(e.width) + "x" + std::to_string(e.height) + "x" +
-                     std::to_string(e.channels) + ", wrap-around=" +
-                     (difftest::has_wraparound_delta(pix, e.channels) ? "yes" : "no") +
+                     std::to_string(e.channels) + ", wrap-around=" + (wraps ? "yes" : "no") +
                      "): encoded bytes differ at offset " + std::to_string(at) + " (ada " +
                      difftest::hex_at(ada, at) + "| c++ " + difftest::hex_at(cpp, at) +
                      "), sizes " + std::to_string(ada.size()) + "/" + std::to_string(cpp.size()));
@@ -487,6 +488,32 @@ private:
 // ---------------------------------------------------------------------------
 // selftest
 // ---------------------------------------------------------------------------
+
+// Tampers with one generated driver-output file, expects the (stop-at-first) checker to reject
+// the run, then restores the file. An empty `mutate` deletes the file instead of editing it.
+// Returns false (after printing `message`) when the tampering went unnoticed or I/O failed.
+bool tamper_is_detected(const std::string& dir, const std::string& name,
+                        const std::function<bool(Bytes&)>& mutate, const char* message) {
+    const std::string file = path_of(dir, name);
+    Bytes saved;
+    if (!read_file(file, saved)) {
+        return false;
+    }
+    if (mutate) {
+        Bytes edited = saved;
+        if (!mutate(edited) || !write_file(file, edited)) {
+            return false;
+        }
+    } else {
+        fs::remove(file);
+    }
+    const bool detected = Checker(true).run(dir) != 0;
+    if (!detected) {
+        std::cerr << "selftest: " << message << " went unnoticed\n";
+    }
+    return write_file(file, saved) && detected;
+}
+
 int selftest(const std::string& dir) {
     fs::remove_all(dir);
     if (!Generator(dir).run()) {
@@ -502,62 +529,46 @@ int selftest(const std::string& dir) {
     }
 
     // The check must notice a corrupted Ada encoder result ...
-    Bytes ada;
-    if (!read_file(path_of(dir, "e0000.ada.qoi"), ada) || ada.size() < 15) {
+    if (!tamper_is_detected(
+            dir, "e0000.ada.qoi",
+            [](Bytes& b) {
+                if (b.size() < 15) {
+                    return false;
+                }
+                b[14] = static_cast<std::uint8_t>(b[14] ^ 0x01U);
+                return true;
+            },
+            "a corrupted encoder result")) {
         return 1;
     }
-    Bytes saved = ada;
-    ada[14] = static_cast<std::uint8_t>(ada[14] ^ 0x01U);
-    if (!write_file(path_of(dir, "e0000.ada.qoi"), ada)) {
-        return 1;
-    }
-    if (Checker(true).run(dir) == 0) {
-        std::cerr << "selftest: a corrupted encoder result went unnoticed\n";
-        return 1;
-    }
-    write_file(path_of(dir, "e0000.ada.qoi"), saved);
-
     // ... a flipped accept/reject decision ...
-    Bytes saved_res;
-    if (!read_file(path_of(dir, "d00000.ada.res"), saved_res)) {
+    if (!tamper_is_detected(
+            dir, "d00000.ada.res",
+            [](Bytes& b) {
+                const std::string t = "reject\n0 0 0 0\n";
+                b.assign(t.begin(), t.end());
+                return true;
+            },
+            "a wrong decoder verdict")) {
         return 1;
     }
-    if (!write_text(path_of(dir, "d00000.ada.res"), "reject\n0 0 0 0\n")) {
-        return 1;
-    }
-    if (Checker(true).run(dir) == 0) {
-        std::cerr << "selftest: a wrong decoder verdict went unnoticed\n";
-        return 1;
-    }
-    write_file(path_of(dir, "d00000.ada.res"), saved_res);
-
     // ... a corrupted decoded pixel ...
-    Bytes dec;
-    if (!read_file(path_of(dir, "d00000.ada.dec"), dec) || dec.empty()) {
+    if (!tamper_is_detected(
+            dir, "d00000.ada.dec",
+            [](Bytes& b) {
+                if (b.empty()) {
+                    return false;
+                }
+                b[0] = static_cast<std::uint8_t>(b[0] ^ 0x80U);
+                return true;
+            },
+            "a corrupted decoded pixel")) {
         return 1;
     }
-    const Bytes saved_dec = dec;
-    dec[0] = static_cast<std::uint8_t>(dec[0] ^ 0x80U);
-    if (!write_file(path_of(dir, "d00000.ada.dec"), dec)) {
-        return 1;
-    }
-    if (Checker(true).run(dir) == 0) {
-        std::cerr << "selftest: a corrupted decoded pixel went unnoticed\n";
-        return 1;
-    }
-    write_file(path_of(dir, "d00000.ada.dec"), saved_dec);
-
     // ... and a missing driver output.
-    Bytes saved_res1;
-    if (!read_file(path_of(dir, "d00001.ada.res"), saved_res1)) {
+    if (!tamper_is_detected(dir, "d00001.ada.res", {}, "a missing decoder result")) {
         return 1;
     }
-    fs::remove(path_of(dir, "d00001.ada.res"));
-    if (Checker(true).run(dir) == 0) {
-        std::cerr << "selftest: a missing decoder result went unnoticed\n";
-        return 1;
-    }
-    write_file(path_of(dir, "d00001.ada.res"), saved_res1);
     if (Checker().run(dir) != 0) {
         std::cerr << "selftest: the restored results must pass again\n";
         return 1;
