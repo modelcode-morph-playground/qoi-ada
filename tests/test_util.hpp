@@ -29,8 +29,7 @@ using Bytes = std::vector<std::uint8_t>;
 
 // Truncating conversion to one byte (modulo 256), usable with int and unsigned
 // arguments without tripping -Wconversion.
-template <typename T>
-constexpr std::uint8_t u8(T value) noexcept {
+template <typename T> constexpr std::uint8_t u8(T value) noexcept {
     return static_cast<std::uint8_t>(static_cast<unsigned>(value) & 0xFFU);
 }
 
@@ -55,8 +54,8 @@ inline Bytes concat(std::initializer_list<Bytes> parts) {
 // colorspace byte.
 inline Bytes header(std::uint32_t width, std::uint32_t height, std::uint8_t channels,
                     std::uint8_t colorspace) {
-    return concat({Bytes{0x71, 0x6F, 0x69, 0x66}, be32(width), be32(height),
-                   Bytes{channels, colorspace}});
+    return concat(
+        {Bytes{0x71, 0x6F, 0x69, 0x66}, be32(width), be32(height), Bytes{channels, colorspace}});
 }
 
 // The 8-byte end marker: seven zero bytes and a one.
@@ -184,8 +183,7 @@ inline ::testing::AssertionResult DescEq(const qoi::Desc& expected, const qoi::D
 }
 
 // True if every byte in [begin, end) of the buffer equals `value`.
-inline bool all_equal(const Bytes& buffer, std::size_t begin, std::size_t end,
-                      std::uint8_t value) {
+inline bool all_equal(const Bytes& buffer, std::size_t begin, std::size_t end, std::uint8_t value) {
     for (std::size_t i = begin; i < end; ++i) {
         if (buffer[i] != value) {
             return false;

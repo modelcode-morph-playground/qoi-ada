@@ -45,7 +45,8 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     qoi::Desc desc;
     qoi::get_desc(input, desc);
 
-    const bool header_ok = desc.width != 0 && desc.height != 0 && desc.channels >= 3 && desc.channels <= 4;
+    const bool header_ok =
+        desc.width != 0 && desc.height != 0 && desc.channels >= 3 && desc.channels <= 4;
 
     // Decoding into no buffer at all must fail without touching memory.
     {

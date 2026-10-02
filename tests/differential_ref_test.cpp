@@ -17,14 +17,14 @@
 //
 // The decoders are specified identically, so decoder differentials are asserted
 // on every stream, including malformed ones.
-#include <gtest/gtest.h>
-
 #include <cstddef>
 #include <cstdint>
 #include <iostream>
 #include <random>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "diff_util.hpp"
 #include "third_party/qoi_reference_wrapper.h"
@@ -57,8 +57,10 @@ bool parse_dims(const Bytes& d, std::uint64_t& w, std::uint64_t& h, std::uint64_
     if (d.size() < 14) {
         return false;
     }
-    w = (std::uint64_t{d[4]} << 24) | (std::uint64_t{d[5]} << 16) | (std::uint64_t{d[6]} << 8) | d[7];
-    h = (std::uint64_t{d[8]} << 24) | (std::uint64_t{d[9]} << 16) | (std::uint64_t{d[10]} << 8) | d[11];
+    w = (std::uint64_t{d[4]} << 24) | (std::uint64_t{d[5]} << 16) | (std::uint64_t{d[6]} << 8) |
+        d[7];
+    h = (std::uint64_t{d[8]} << 24) | (std::uint64_t{d[9]} << 16) | (std::uint64_t{d[10]} << 8) |
+        d[11];
     c = d[12];
     return true;
 }
@@ -77,7 +79,8 @@ RefDecoded ref_decode(const Bytes& data) {
         cap = static_cast<std::size_t>(w * h * c);
     }
     r.pixels.assign(cap, 0);
-    const std::size_t n = qoi_ref_decode(data.data(), data.size(), 0, &r.desc, r.pixels.data(), cap);
+    const std::size_t n =
+        qoi_ref_decode(data.data(), data.size(), 0, &r.desc, r.pixels.data(), cap);
     EXPECT_NE(n, QOI_REF_BUFFER_TOO_SMALL);
     r.ok = n != 0 && n != QOI_REF_BUFFER_TOO_SMALL;
     if (r.ok) {
@@ -119,7 +122,8 @@ struct Encoded {
     Bytes ref;
 };
 
-Encoded encode_both(const Bytes& pix, unsigned w, unsigned h, unsigned channels, unsigned colorspace) {
+Encoded encode_both(const Bytes& pix, unsigned w, unsigned h, unsigned channels,
+                    unsigned colorspace) {
     Encoded e;
     e.ours = difftest::ours_encode(pix, w, h, channels, cs_of(colorspace));
     e.ref = ref_encode(pix, w, h, channels, colorspace);
@@ -144,13 +148,15 @@ TEST(DifferentialRef, CraftedCleanCasesAreByteIdentical) {
             ASSERT_FALSE(e.ours.empty());
             ASSERT_FALSE(e.ref.empty());
             EXPECT_TRUE(e.ours == e.ref)
-                << "streams differ at offset " << difftest::first_diff(e.ours, e.ref)
-                << " (ours " << difftest::hex_at(e.ours, difftest::first_diff(e.ours, e.ref))
-                << "reference " << difftest::hex_at(e.ref, difftest::first_diff(e.ours, e.ref)) << ")";
+                << "streams differ at offset " << difftest::first_diff(e.ours, e.ref) << " (ours "
+                << difftest::hex_at(e.ours, difftest::first_diff(e.ours, e.ref)) << "reference "
+                << difftest::hex_at(e.ref, difftest::first_diff(e.ours, e.ref)) << ")";
 
             // Each decoder reads each encoder's stream.
-            expect_decodes_to(e.ours, c.pixels, c.width, c.height, c.channels, colorspace, "ours stream");
-            expect_decodes_to(e.ref, c.pixels, c.width, c.height, c.channels, colorspace, "reference stream");
+            expect_decodes_to(e.ours, c.pixels, c.width, c.height, c.channels, colorspace,
+                              "ours stream");
+            expect_decodes_to(e.ref, c.pixels, c.width, c.height, c.channels, colorspace,
+                              "reference stream");
         }
     }
 }
@@ -184,15 +190,18 @@ TEST(DifferentialRef, WrapAroundCraftedCasesDecodeIdenticallyButEncodeDifferentl
             EXPECT_GT(e.ours.size(), e.ref.size());
 
             if (colorspace == 0) {
-                std::cout << "[wrap-around] " << c.name << ": first differing offset " << at << " (ours "
-                          << difftest::hex_at(e.ours, at) << "| reference " << difftest::hex_at(e.ref, at)
-                          << "), sizes ours/reference " << e.ours.size() << "/" << e.ref.size() << "\n";
+                std::cout << "[wrap-around] " << c.name << ": first differing offset " << at
+                          << " (ours " << difftest::hex_at(e.ours, at) << "| reference "
+                          << difftest::hex_at(e.ref, at) << "), sizes ours/reference "
+                          << e.ours.size() << "/" << e.ref.size() << "\n";
                 ::testing::Test::RecordProperty("first_diff_" + c.name, std::to_string(at));
             }
 
             // Decoded pixels are identical, in all four encoder/decoder pairings.
-            expect_decodes_to(e.ours, c.pixels, c.width, c.height, c.channels, colorspace, "ours stream");
-            expect_decodes_to(e.ref, c.pixels, c.width, c.height, c.channels, colorspace, "reference stream");
+            expect_decodes_to(e.ours, c.pixels, c.width, c.height, c.channels, colorspace,
+                              "ours stream");
+            expect_decodes_to(e.ref, c.pixels, c.width, c.height, c.channels, colorspace,
+                              "reference stream");
         }
     }
 }
@@ -231,7 +240,8 @@ TEST(DifferentialRef, RandomImagesFixedSeed) {
             for (const difftest::Size size : difftest::image_sizes()) {
                 for (int rep = 0; rep < 3; ++rep) {
                     const unsigned colorspace = static_cast<unsigned>(rng() & 1U);
-                    const Bytes pix = difftest::make_image(rng, kind, std::size_t{size.w} * size.h, channels);
+                    const Bytes pix =
+                        difftest::make_image(rng, kind, std::size_t{size.w} * size.h, channels);
                     SCOPED_TRACE("kind=" + std::to_string(static_cast<int>(kind)) + " " +
                                  std::to_string(size.w) + "x" + std::to_string(size.h) + "x" +
                                  std::to_string(channels) + " rep=" + std::to_string(rep));
@@ -249,7 +259,8 @@ TEST(DifferentialRef, RandomImagesFixedSeed) {
                         // at the position of the first wrapping pixel or earlier
                         // never (earlier chunks are clean), and the reference
                         // stream must be smaller.
-                        EXPECT_FALSE(e.ours == e.ref) << "classifier says wrap-around, bytes are identical";
+                        EXPECT_FALSE(e.ours == e.ref)
+                            << "classifier says wrap-around, bytes are identical";
                         EXPECT_GT(e.ours.size(), e.ref.size());
                         EXPECT_EQ(info.ada, difftest::DeltaOp::Rgb);
                     } else {
@@ -261,14 +272,17 @@ TEST(DifferentialRef, RandomImagesFixedSeed) {
 
                     // Always: identical decoded pixels from both decoders, for
                     // both encoders' streams.
-                    expect_decodes_to(e.ours, pix, size.w, size.h, channels, colorspace, "ours stream");
-                    expect_decodes_to(e.ref, pix, size.w, size.h, channels, colorspace, "reference stream");
+                    expect_decodes_to(e.ours, pix, size.w, size.h, channels, colorspace,
+                                      "ours stream");
+                    expect_decodes_to(e.ref, pix, size.w, size.h, channels, colorspace,
+                                      "reference stream");
                 }
             }
         }
     }
 
-    std::cout << "[random] images=" << images << " clean=" << clean << " wrapping=" << wrapping << "\n";
+    std::cout << "[random] images=" << images << " clean=" << clean << " wrapping=" << wrapping
+              << "\n";
     ::testing::Test::RecordProperty("images", std::to_string(images));
     ::testing::Test::RecordProperty("clean", std::to_string(clean));
     ::testing::Test::RecordProperty("wrapping", std::to_string(wrapping));
@@ -290,8 +304,9 @@ int expect_decoders_agree(const Bytes& data) {
     if (ours.skipped || ref.skipped) {
         return -1;
     }
-    EXPECT_EQ(ours.ok, ref.ok) << "accept/reject disagreement (ours " << ours.ok << ", reference " << ref.ok
-                               << "), size " << data.size() << ", head " << difftest::hex_at(data, 0, 14);
+    EXPECT_EQ(ours.ok, ref.ok) << "accept/reject disagreement (ours " << ours.ok << ", reference "
+                               << ref.ok << "), size " << data.size() << ", head "
+                               << difftest::hex_at(data, 0, 14);
     if (ours.ok && ref.ok) {
         EXPECT_EQ(ours.width, ref.desc.width);
         EXPECT_EQ(ours.height, ref.desc.height);
@@ -324,7 +339,8 @@ TEST(DifferentialRef, DecoderRandomChunkStreams) {
         accepted += r > 0 ? 1U : 0U;
         rejected += r == 0 ? 1U : 0U;
     }
-    std::cout << "[decoder] random streams accepted=" << accepted << " rejected=" << rejected << "\n";
+    std::cout << "[decoder] random streams accepted=" << accepted << " rejected=" << rejected
+              << "\n";
     EXPECT_GT(accepted, 1000U);
     EXPECT_GT(rejected, 50U);  // streams shorter than 22 bytes
 }
@@ -340,7 +356,8 @@ TEST(DifferentialRef, DecoderTruncatedEncoderOutput) {
             const Encoded e = encode_both(pix, 12, 9, channels, 0);
             for (const Bytes* stream : {&e.ours, &e.ref}) {
                 for (std::size_t len = 0; len <= stream->size(); ++len) {
-                    const Bytes cut(stream->begin(), stream->begin() + static_cast<std::ptrdiff_t>(len));
+                    const Bytes cut(stream->begin(),
+                                    stream->begin() + static_cast<std::ptrdiff_t>(len));
                     SCOPED_TRACE("kind=" + std::to_string(static_cast<int>(kind)) + " channels=" +
                                  std::to_string(channels) + " prefix=" + std::to_string(len));
                     expect_decoders_agree(cut);
@@ -373,7 +390,8 @@ TEST(DifferentialRef, DecoderCorruptedHeaders) {
         accepted += r > 0 ? 1U : 0U;
         rejected += r == 0 ? 1U : 0U;
     }
-    std::cout << "[decoder] corrupted headers accepted=" << accepted << " rejected=" << rejected << "\n";
+    std::cout << "[decoder] corrupted headers accepted=" << accepted << " rejected=" << rejected
+              << "\n";
     EXPECT_GT(accepted, 100U);
     EXPECT_GT(rejected, 100U);
 }
@@ -390,9 +408,10 @@ TEST(DifferentialRef, DecoderRejectsInvalidHeadersLikeReference) {
         std::uint8_t value;
     };
     const Edit edits[] = {
-        {"magic0", 0, 'x'},      {"magic3", 3, 'g'},    {"width-zero", 7, 0},  {"height-zero", 11, 0},
-        {"channels-0", 12, 0},   {"channels-1", 12, 1}, {"channels-2", 12, 2}, {"channels-5", 12, 5},
-        {"channels-255", 12, 255}, {"colorspace-2", 13, 2}, {"colorspace-255", 13, 255},
+        {"magic0", 0, 'x'},      {"magic3", 3, 'g'},          {"width-zero", 7, 0},
+        {"height-zero", 11, 0},  {"channels-0", 12, 0},       {"channels-1", 12, 1},
+        {"channels-2", 12, 2},   {"channels-5", 12, 5},       {"channels-255", 12, 255},
+        {"colorspace-2", 13, 2}, {"colorspace-255", 13, 255},
     };
     for (const Edit& edit : edits) {
         SCOPED_TRACE(edit.name);
@@ -416,11 +435,16 @@ TEST(DifferentialRef, DecoderRejectsHugeDimensionsLikeReference) {
         std::uint32_t w;
         std::uint32_t h;
     };
-    const Dims dims[] = {{0xFFFFFFFFU, 0xFFFFFFFFU}, {0x7FFFFFFFU, 2}, {2, 0x7FFFFFFFU},
-                         {20000, 20000},             {1, 400000000U},  {400000000U, 1}};
+    const Dims dims[] = {{0xFFFFFFFFU, 0xFFFFFFFFU},
+                         {0x7FFFFFFFU, 2},
+                         {2, 0x7FFFFFFFU},
+                         {20000, 20000},
+                         {1, 400000000U},
+                         {400000000U, 1}};
     for (const Dims& d : dims) {
         for (const unsigned channels : {3U, 4U}) {
-            SCOPED_TRACE(std::to_string(d.w) + "x" + std::to_string(d.h) + "x" + std::to_string(channels));
+            SCOPED_TRACE(std::to_string(d.w) + "x" + std::to_string(d.h) + "x" +
+                         std::to_string(channels));
             Bytes s = difftest::make_header(d.w, d.h, channels, 0);
             s.insert(s.end(), {0xFE, 1, 2, 3});
             difftest::append_padding(s);
@@ -450,7 +474,8 @@ TEST(DifferentialRef, DecoderForcedChannelsMatchesDroppingAlpha) {
 
         Bytes rgb(15 * 4 * 3, 0);
         qoi_ref_desc rd{};
-        ASSERT_EQ(qoi_ref_decode(stream.data(), stream.size(), 3, &rd, rgb.data(), rgb.size()), rgb.size());
+        ASSERT_EQ(qoi_ref_decode(stream.data(), stream.size(), 3, &rd, rgb.data(), rgb.size()),
+                  rgb.size());
         Bytes dropped;
         for (std::size_t p = 0; p < 15 * 4; ++p) {
             dropped.insert(dropped.end(), ours.pixels.begin() + static_cast<std::ptrdiff_t>(p * 4),

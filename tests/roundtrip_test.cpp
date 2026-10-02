@@ -43,8 +43,8 @@ constexpr std::size_t kGuardSize = 16;
 
 std::string describe(const qoi::Desc& desc, const std::string& what) {
     return what + " " + std::to_string(desc.width) + "x" + std::to_string(desc.height) + "x" +
-           std::to_string(desc.channels) + " cs=" +
-           std::to_string(static_cast<unsigned>(desc.colorspace));
+           std::to_string(desc.channels) +
+           " cs=" + std::to_string(static_cast<unsigned>(desc.colorspace));
 }
 
 // Returns the encoded stream (for callers that want to inspect it further).
@@ -98,8 +98,8 @@ Bytes check_round_trip(const qoi::Desc& desc, const Bytes& pix, const std::strin
     {
         Bytes out(pix.size() + kGuardSize, kGuard);
         qoi::Desc decoded = qoi_test::poisoned_desc();
-        const std::size_t size = qoi::decode(
-            exact_stream.span(), decoded, qoi::Span<std::uint8_t>(out.data(), pix.size()));
+        const std::size_t size = qoi::decode(exact_stream.span(), decoded,
+                                             qoi::Span<std::uint8_t>(out.data(), pix.size()));
         EXPECT_EQ(size, pix.size());
         EXPECT_TRUE(DescEq(desc, decoded));
         EXPECT_TRUE(BytesEqual(pix, out, pix.size()));
@@ -137,7 +137,8 @@ void quick_round_trip(const qoi::Desc& desc, const Bytes& pix) {
     ASSERT_LE(n, buffer.size());
     Bytes out(pix.size());
     qoi::Desc decoded = qoi_test::poisoned_desc();
-    const std::size_t size = qoi::decode(qoi::Span<const std::uint8_t>(buffer.data(), n), decoded, out);
+    const std::size_t size =
+        qoi::decode(qoi::Span<const std::uint8_t>(buffer.data(), n), decoded, out);
     ASSERT_EQ(size, pix.size()) << qoi_test::hex(pix);
     ASSERT_TRUE(DescEq(desc, decoded));
     ASSERT_TRUE(BytesEqual(pix, out)) << "stream: " << qoi_test::hex(buffer.data(), n);
@@ -150,9 +151,9 @@ struct Shape {
 
 const std::vector<Shape>& shapes() {
     static const std::vector<Shape> all = {
-        {1, 1},  {1, 2},  {2, 1},  {2, 2},  {3, 1},  {1, 3},  {3, 3},   {4, 5},  {5, 4},
-        {7, 9},  {9, 7},  {1, 61}, {61, 1}, {1, 62}, {62, 1}, {1, 63},  {63, 1}, {1, 64},
-        {64, 1}, {8, 8},  {16, 16}, {31, 17}, {17, 31}, {1, 100}, {100, 1}, {64, 63}, {33, 65},
+        {1, 1},  {1, 2}, {2, 1},   {2, 2},   {3, 1},   {1, 3},   {3, 3},   {4, 5},   {5, 4},
+        {7, 9},  {9, 7}, {1, 61},  {61, 1},  {1, 62},  {62, 1},  {1, 63},  {63, 1},  {1, 64},
+        {64, 1}, {8, 8}, {16, 16}, {31, 17}, {17, 31}, {1, 100}, {100, 1}, {64, 63}, {33, 65},
     };
     return all;
 }
@@ -168,7 +169,8 @@ TEST(RoundTrip, NoiseAllShapesChannelsColorspaces) {
     for (const Shape& s : shapes()) {
         for (const std::size_t channels : {3U, 4U}) {
             for (std::size_t cs = 0; cs < 2; ++cs) {
-                const qoi::Desc desc = make_desc(s.width, s.height, channels, qoi_test::colorspace_of(cs));
+                const qoi::Desc desc =
+                    make_desc(s.width, s.height, channels, qoi_test::colorspace_of(cs));
                 check_round_trip(desc, qoi_test::noise_image(s.width, s.height, channels, ++seed),
                                  "noise");
             }
@@ -178,9 +180,9 @@ TEST(RoundTrip, NoiseAllShapesChannelsColorspaces) {
 
 TEST(RoundTrip, FlatImages) {
     const std::vector<std::array<std::uint8_t, 4>> colours = {
-        {0, 0, 0, 255},     {0, 0, 0, 0},       {255, 255, 255, 255}, {255, 255, 255, 0},
-        {1, 2, 3, 4},       {128, 128, 128, 128}, {255, 0, 0, 255},   {0, 255, 0, 1},
-        {17, 200, 99, 254},
+        {0, 0, 0, 255},     {0, 0, 0, 0},   {255, 255, 255, 255},
+        {255, 255, 255, 0}, {1, 2, 3, 4},   {128, 128, 128, 128},
+        {255, 0, 0, 255},   {0, 255, 0, 1}, {17, 200, 99, 254},
     };
     for (const Shape& s : shapes()) {
         for (const auto& colour : colours) {
@@ -196,7 +198,8 @@ TEST(RoundTrip, FlatImages) {
 TEST(RoundTrip, GradientsHorizontalAndVertical) {
     for (const Shape& s : shapes()) {
         for (const std::size_t channels : {3U, 4U}) {
-            const qoi::Desc desc = make_desc(s.width, s.height, channels, qoi::Colorspace::SRGB_Linear_Alpha);
+            const qoi::Desc desc =
+                make_desc(s.width, s.height, channels, qoi::Colorspace::SRGB_Linear_Alpha);
             check_round_trip(desc, qoi_test::horizontal_gradient_image(s.width, s.height, channels),
                              "horizontal gradient");
             check_round_trip(desc, qoi_test::vertical_gradient_image(s.width, s.height, channels),
@@ -221,7 +224,8 @@ TEST(RoundTrip, RunsInterleavedWithNoise) {
     for (const Shape& s : {Shape{200, 50}, Shape{1, 3000}, Shape{3000, 1}, Shape{97, 101}}) {
         for (const std::size_t channels : {3U, 4U}) {
             const qoi::Desc desc = make_desc(s.width, s.height, channels);
-            check_round_trip(desc, qoi_test::runs_and_noise_image(s.width, s.height, channels, ++seed),
+            check_round_trip(desc,
+                             qoi_test::runs_and_noise_image(s.width, s.height, channels, ++seed),
                              "runs and noise");
         }
     }
@@ -309,8 +313,10 @@ TEST(RoundTrip, AlphaVariations) {
 }
 
 TEST(RoundTrip, LargeImages) {
-    check_round_trip(make_desc(512, 384, 3), qoi_test::noise_image(512, 384, 3, 777), "large noise");
-    check_round_trip(make_desc(512, 384, 4), qoi_test::noise_image(512, 384, 4, 778), "large noise");
+    check_round_trip(make_desc(512, 384, 3), qoi_test::noise_image(512, 384, 3, 777),
+                     "large noise");
+    check_round_trip(make_desc(512, 384, 4), qoi_test::noise_image(512, 384, 4, 778),
+                     "large noise");
     check_round_trip(make_desc(640, 480, 3), qoi_test::horizontal_gradient_image(640, 480, 3),
                      "large gradient");
     check_round_trip(make_desc(640, 480, 4), qoi_test::flat_image(640, 480, 4, {0, 0, 0, 255}),
@@ -384,8 +390,9 @@ TEST(RoundTrip, BoundaryValuePixelPairs) {
                 for (const unsigned r1 : values) {
                     for (const unsigned g1 : values) {
                         for (const unsigned b1 : values) {
-                            const Bytes pix = {qoi_test::u8(r0), qoi_test::u8(g0), qoi_test::u8(b0),
-                                               qoi_test::u8(r1), qoi_test::u8(g1), qoi_test::u8(b1)};
+                            const Bytes pix = {qoi_test::u8(r0), qoi_test::u8(g0),
+                                               qoi_test::u8(b0), qoi_test::u8(r1),
+                                               qoi_test::u8(g1), qoi_test::u8(b1)};
                             quick_round_trip(make_desc(2, 1, 3), pix);
                             if (::testing::Test::HasFatalFailure()) {
                                 return;
@@ -405,8 +412,10 @@ TEST(RoundTrip, BoundaryValueRgbaPairs) {
         for (const unsigned a0 : values) {
             for (const unsigned c1 : values) {
                 for (const unsigned a1 : values) {
-                    const Bytes pix = {qoi_test::u8(c0), qoi_test::u8(c0 / 2U), qoi_test::u8(c0), qoi_test::u8(a0),
-                                       qoi_test::u8(c1), qoi_test::u8(c1 / 2U), qoi_test::u8(c1), qoi_test::u8(a1)};
+                    const Bytes pix = {qoi_test::u8(c0), qoi_test::u8(c0 / 2U),
+                                       qoi_test::u8(c0), qoi_test::u8(a0),
+                                       qoi_test::u8(c1), qoi_test::u8(c1 / 2U),
+                                       qoi_test::u8(c1), qoi_test::u8(a1)};
                     quick_round_trip(make_desc(2, 1, 4), pix);
                     if (::testing::Test::HasFatalFailure()) {
                         return;
@@ -424,28 +433,29 @@ TEST(RoundTrip, RandomisedFixedSeeds) {
         const std::size_t width = 1U + rng.below(48U);
         const std::size_t height = 1U + rng.below(48U);
         const std::size_t channels = 3U + rng.below(2U);
-        const qoi::Desc desc = make_desc(width, height, channels, qoi_test::colorspace_of(rng.below(2U)));
+        const qoi::Desc desc =
+            make_desc(width, height, channels, qoi_test::colorspace_of(rng.below(2U)));
         Bytes pix;
         switch (rng.below(6U)) {
-            case 0:
-                pix = qoi_test::noise_image(width, height, channels, seed);
-                break;
-            case 1:
-                pix = qoi_test::palette_image(width, height, channels, seed, 1U + rng.below(70U));
-                break;
-            case 2:
-                pix = qoi_test::runs_and_noise_image(width, height, channels, seed);
-                break;
-            case 3:
-                pix = qoi_test::near_equal_image(width, height, channels, seed, 1U + rng.below(12U),
-                                                 rng.byte());
-                break;
-            case 4:
-                pix = qoi_test::horizontal_gradient_image(width, height, channels);
-                break;
-            default:
-                pix = qoi_test::vertical_gradient_image(width, height, channels);
-                break;
+        case 0:
+            pix = qoi_test::noise_image(width, height, channels, seed);
+            break;
+        case 1:
+            pix = qoi_test::palette_image(width, height, channels, seed, 1U + rng.below(70U));
+            break;
+        case 2:
+            pix = qoi_test::runs_and_noise_image(width, height, channels, seed);
+            break;
+        case 3:
+            pix = qoi_test::near_equal_image(width, height, channels, seed, 1U + rng.below(12U),
+                                             rng.byte());
+            break;
+        case 4:
+            pix = qoi_test::horizontal_gradient_image(width, height, channels);
+            break;
+        default:
+            pix = qoi_test::vertical_gradient_image(width, height, channels);
+            break;
         }
         check_round_trip(desc, pix, "random seed " + std::to_string(seed));
         if (::testing::Test::HasFatalFailure()) {
@@ -461,7 +471,8 @@ TEST(RoundTrip, ColorspaceDoesNotChangeTheChunkStream) {
     Bytes a(qoi::encode_worst_case(make_desc(20, 20, 4)));
     Bytes b(a.size());
     const std::size_t na = qoi::encode(pix, make_desc(20, 20, 4, qoi::Colorspace::SRGB), a);
-    const std::size_t nb = qoi::encode(pix, make_desc(20, 20, 4, qoi::Colorspace::SRGB_Linear_Alpha), b);
+    const std::size_t nb =
+        qoi::encode(pix, make_desc(20, 20, 4, qoi::Colorspace::SRGB_Linear_Alpha), b);
     ASSERT_EQ(na, nb);
     EXPECT_EQ(static_cast<unsigned>(a[13]), 0u);
     EXPECT_EQ(static_cast<unsigned>(b[13]), 1u);
@@ -478,6 +489,8 @@ TEST(RoundTrip, TransposedDimensionsKeepTheirOwnDescriptor) {
     const Bytes wide = check_round_trip(make_desc(6, 4, 3), pix, "6x4");
     const Bytes tall = check_round_trip(make_desc(4, 6, 3), pix, "4x6");
     ASSERT_EQ(wide.size(), tall.size());
-    EXPECT_TRUE(BytesEqual(Bytes(wide.begin() + 14, wide.end()), Bytes(tall.begin() + 14, tall.end())));
-    EXPECT_FALSE(BytesEqual(Bytes(wide.begin(), wide.begin() + 14), Bytes(tall.begin(), tall.begin() + 14)));
+    EXPECT_TRUE(
+        BytesEqual(Bytes(wide.begin() + 14, wide.end()), Bytes(tall.begin() + 14, tall.end())));
+    EXPECT_FALSE(
+        BytesEqual(Bytes(wide.begin(), wide.begin() + 14), Bytes(tall.begin(), tall.begin() + 14)));
 }

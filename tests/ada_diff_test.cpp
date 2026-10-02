@@ -86,7 +86,8 @@ bool write_file(const std::string& path, const Bytes& data) {
         std::cerr << "cannot write " << path << "\n";
         return false;
     }
-    out.write(reinterpret_cast<const char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    out.write(reinterpret_cast<const char*>(data.data()),
+              static_cast<std::streamsize>(data.size()));
     return static_cast<bool>(out);
 }
 
@@ -207,24 +208,27 @@ public:
         if (!ok_) {
             return false;
         }
-        std::cout << "gen: " << encodes_ << " encode cases, " << decodes_ << " decode cases in " << dir_ << "\n";
+        std::cout << "gen: " << encodes_ << " encode cases, " << decodes_ << " decode cases in "
+                  << dir_ << "\n";
         return write_text(path_of(dir_, "manifest.txt"), manifest_);
     }
 
 private:
-    void add_encode(const std::string& name, const Bytes& pix, unsigned w, unsigned h, unsigned channels,
-                    unsigned colorspace) {
+    void add_encode(const std::string& name, const Bytes& pix, unsigned w, unsigned h,
+                    unsigned channels, unsigned colorspace) {
         const std::string id = id_of('e', encodes_++, 4);
         const Bytes stream = difftest::ours_encode(
-            pix, w, h, channels, colorspace == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha);
+            pix, w, h, channels,
+            colorspace == 0 ? qoi::Colorspace::SRGB : qoi::Colorspace::SRGB_Linear_Alpha);
         if (stream.empty()) {
             std::cerr << "qoi::encode failed for " << name << "\n";
             ok_ = false;
             return;
         }
-        ok_ = write_file(path_of(dir_, id + ".raw"), pix) && write_file(path_of(dir_, id + ".cpp.qoi"), stream) && ok_;
-        manifest_ += "E " + id + " " + std::to_string(w) + " " + std::to_string(h) + " " + std::to_string(channels) +
-                     " " + std::to_string(colorspace) + "\n";
+        ok_ = write_file(path_of(dir_, id + ".raw"), pix) &&
+              write_file(path_of(dir_, id + ".cpp.qoi"), stream) && ok_;
+        manifest_ += "E " + id + " " + std::to_string(w) + " " + std::to_string(h) + " " +
+                     std::to_string(channels) + " " + std::to_string(colorspace) + "\n";
         // Ada must decode the C++ stream back to the original pixels.
         const std::string did = id_of('d', decodes_++, 5);
         ok_ = write_file(path_of(dir_, did + ".in"), stream) && ok_;
@@ -253,8 +257,10 @@ private:
         for (const difftest::Kind kind : difftest::kAllKinds) {
             for (const unsigned channels : {3U, 4U}) {
                 for (const difftest::Size size : difftest::image_sizes()) {
-                    const Bytes pix = difftest::make_image(rng, kind, std::size_t{size.w} * size.h, channels);
-                    add_encode("random", pix, size.w, size.h, channels, static_cast<unsigned>(rng() & 1U));
+                    const Bytes pix =
+                        difftest::make_image(rng, kind, std::size_t{size.w} * size.h, channels);
+                    add_encode("random", pix, size.w, size.h, channels,
+                               static_cast<unsigned>(rng() & 1U));
                 }
             }
         }
@@ -265,7 +271,8 @@ private:
         for (int i = 0; i < 1500; ++i) {
             const std::uint32_t w = 1 + difftest::below(rng, 24);
             const std::uint32_t h = 1 + difftest::below(rng, 24);
-            add_decode(difftest::make_random_stream(rng, w, h, 3 + static_cast<unsigned>(rng() & 1U),
+            add_decode(difftest::make_random_stream(rng, w, h,
+                                                    3 + static_cast<unsigned>(rng() & 1U),
                                                     static_cast<unsigned>(rng() & 1U)));
         }
     }
@@ -276,9 +283,11 @@ private:
                                           difftest::Kind::Runs, difftest::Kind::AlphaNoise}) {
             for (const unsigned channels : {3U, 4U}) {
                 const Bytes pix = difftest::make_image(rng, kind, 12 * 9, channels);
-                const Bytes stream = difftest::ours_encode(pix, 12, 9, channels, qoi::Colorspace::SRGB);
+                const Bytes stream =
+                    difftest::ours_encode(pix, 12, 9, channels, qoi::Colorspace::SRGB);
                 for (std::size_t len = 0; len <= stream.size(); ++len) {
-                    add_decode(Bytes(stream.begin(), stream.begin() + static_cast<std::ptrdiff_t>(len)));
+                    add_decode(
+                        Bytes(stream.begin(), stream.begin() + static_cast<std::ptrdiff_t>(len)));
                 }
             }
         }
@@ -340,7 +349,8 @@ int emulate(const std::string& dir) {
             }
             const DecodeResult r = cpp_decode(in);
             std::ostringstream res;
-            res << r.status << "\n" << r.width << " " << r.height << " " << r.channels << " " << r.colorspace << "\n";
+            res << r.status << "\n"
+                << r.width << " " << r.height << " " << r.channels << " " << r.colorspace << "\n";
             if (!write_text(path_of(dir, e.id + ".ada.res"), res.str())) {
                 return 1;
             }
@@ -377,9 +387,10 @@ public:
                 break;
             }
         }
-        std::cout << "QOI_ADA_DIFF_CHECKED encode=" << encodes_ << " decode=" << decodes_ << " (accepted "
-                  << accepted_ << ", rejected " << rejected_ << ", skipped " << skipped_ << ") wrap-around inputs="
-                  << wrapping_ << " mismatches=" << mismatches_ << std::endl;
+        std::cout << "QOI_ADA_DIFF_CHECKED encode=" << encodes_ << " decode=" << decodes_
+                  << " (accepted " << accepted_ << ", rejected " << rejected_ << ", skipped "
+                  << skipped_ << ") wrap-around inputs=" << wrapping_
+                  << " mismatches=" << mismatches_ << std::endl;
         return mismatches_ == 0 ? 0 : 1;
     }
 
@@ -395,7 +406,8 @@ private:
         Bytes pix;
         Bytes cpp;
         Bytes ada;
-        if (!read_file(path_of(dir, e.id + ".raw"), pix) || !read_file(path_of(dir, e.id + ".cpp.qoi"), cpp)) {
+        if (!read_file(path_of(dir, e.id + ".raw"), pix) ||
+            !read_file(path_of(dir, e.id + ".cpp.qoi"), cpp)) {
             mismatch(e.id + ": missing generated files");
             return;
         }
@@ -411,9 +423,9 @@ private:
             mismatch(e.id + " (" + std::to_string(e.width) + "x" + std::to_string(e.height) + "x" +
                      std::to_string(e.channels) + ", wrap-around=" +
                      (difftest::has_wraparound_delta(pix, e.channels) ? "yes" : "no") +
-                     "): encoded bytes differ at offset " + std::to_string(at) + " (ada " + difftest::hex_at(ada, at) +
-                     "| c++ " + difftest::hex_at(cpp, at) + "), sizes " + std::to_string(ada.size()) + "/" +
-                     std::to_string(cpp.size()));
+                     "): encoded bytes differ at offset " + std::to_string(at) + " (ada " +
+                     difftest::hex_at(ada, at) + "| c++ " + difftest::hex_at(cpp, at) +
+                     "), sizes " + std::to_string(ada.size()) + "/" + std::to_string(cpp.size()));
         }
     }
 
@@ -438,14 +450,15 @@ private:
             ++skipped_;
         }
 
-        const std::string where = e.id + " (" + std::to_string(in.size()) + " bytes, head " + difftest::hex_at(in, 0, 14) + ")";
+        const std::string where = e.id + " (" + std::to_string(in.size()) + " bytes, head " +
+                                  difftest::hex_at(in, 0, 14) + ")";
         if (ada.status != cpp.status) {
             mismatch(where + ": Ada says " + ada.status + ", C++ says " + cpp.status);
             return;
         }
         if (ada.status == "accept") {
-            if (ada.width != cpp.width || ada.height != cpp.height || ada.channels != cpp.channels ||
-                ada.colorspace != cpp.colorspace) {
+            if (ada.width != cpp.width || ada.height != cpp.height ||
+                ada.channels != cpp.channels || ada.colorspace != cpp.colorspace) {
                 mismatch(where + ": header fields differ");
             }
             if (ada.pixels != cpp.pixels) {
@@ -458,7 +471,8 @@ private:
             if (!read_file(path_of(dir, e.raw_id + ".raw"), raw)) {
                 mismatch(where + ": missing raw pixels " + e.raw_id);
             } else if (ada.status != "accept" || ada.pixels != raw) {
-                mismatch(where + ": Ada did not decode the C++ encoder output (" + e.raw_id + ") to the original pixels");
+                mismatch(where + ": Ada did not decode the C++ encoder output (" + e.raw_id +
+                         ") to the original pixels");
             }
         }
     }

@@ -18,9 +18,9 @@ using Bytes = std::vector<std::uint8_t>;
 // The 14 header bytes for a 1x1 image with the given channel count and
 // colorspace byte: magic "qoif", width BE, height BE, channels, colorspace.
 Bytes header_1x1(std::uint8_t channels, std::uint8_t colorspace) {
-    return {0x71, 0x6F, 0x69, 0x66,  // "qoif"
-            0x00, 0x00, 0x00, 0x01,  // width = 1
-            0x00, 0x00, 0x00, 0x01,  // height = 1
+    return {0x71,     0x6F,      0x69, 0x66,  // "qoif"
+            0x00,     0x00,      0x00, 0x01,  // width = 1
+            0x00,     0x00,      0x00, 0x01,  // height = 1
             channels, colorspace};
 }
 

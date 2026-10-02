@@ -71,10 +71,9 @@ std::uint8_t colorspace_byte(const qoi::Desc& desc) {
 // descriptor, independently of the codec).
 void check_golden(const qoi::Desc& desc, const Bytes& pix, const Bytes& chunks) {
     ASSERT_EQ(pix.size(), qoi_test::byte_count(desc)) << "malformed test vector";
-    const Bytes expected =
-        qoi_test::stream(static_cast<std::uint32_t>(desc.width),
-                         static_cast<std::uint32_t>(desc.height),
-                         static_cast<std::uint8_t>(desc.channels), colorspace_byte(desc), chunks);
+    const Bytes expected = qoi_test::stream(
+        static_cast<std::uint32_t>(desc.width), static_cast<std::uint32_t>(desc.height),
+        static_cast<std::uint8_t>(desc.channels), colorspace_byte(desc), chunks);
 
     // Encode into a buffer of exactly the worst-case size, pre-filled with a
     // sentinel so that stray writes are visible.
@@ -131,12 +130,7 @@ void check_pair_cases(const std::vector<PairCase>& cases) {
     for (const PairCase& c : cases) {
         SCOPED_TRACE("second pixel (" + std::to_string(c.r) + "," + std::to_string(c.g) + "," +
                      std::to_string(c.b) + ") expected chunk " + qoi_test::hex(c.chunk));
-        const Bytes pix = {100,
-                           100,
-                           100,
-                           qoi_test::u8(c.r),
-                           qoi_test::u8(c.g),
-                           qoi_test::u8(c.b)};
+        const Bytes pix = {100, 100, 100, qoi_test::u8(c.r), qoi_test::u8(c.g), qoi_test::u8(c.b)};
         Bytes chunks = {0xFE, 0x64, 0x64, 0x64};
         chunks.insert(chunks.end(), c.chunk.begin(), c.chunk.end());
         check_golden(rgb_desc(2, 1), pix, chunks);
@@ -166,9 +160,8 @@ TEST(Golden, HeaderAndPaddingConstants) {
 //   pixel (0,0,0) equals the initial previous pixel (0,0,0,255): run of 1 -> C0
 //   padding 00 00 00 00 00 00 00 01
 TEST(Golden, HeaderRgbSrgbFullStream) {
-    const Bytes expected = {0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-                            0x00, 0x01, 0x03, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
-                            0x00, 0x00, 0x01};
+    const Bytes expected = {0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+                            0x03, 0x00, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
     const qoi::Desc desc = rgb_desc(1, 1, qoi::Colorspace::SRGB);
     const Bytes pix = {0, 0, 0};
     Bytes out(qoi::encode_worst_case(desc), 0xAA);
@@ -181,9 +174,8 @@ TEST(Golden, HeaderRgbSrgbFullStream) {
 // Same, 4 channels and colorspace byte 01: only bytes 12 and 13 change (04 01).
 // Pixel (0,0,0,255) equals the initial previous pixel -> C0.
 TEST(Golden, HeaderRgbaLinearFullStream) {
-    const Bytes expected = {0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00,
-                            0x00, 0x01, 0x04, 0x01, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00,
-                            0x00, 0x00, 0x01};
+    const Bytes expected = {0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+                            0x04, 0x01, 0xC0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01};
     const qoi::Desc desc = rgba_desc(1, 1, qoi::Colorspace::SRGB_Linear_Alpha);
     const Bytes pix = {0, 0, 0, 255};
     Bytes out(qoi::encode_worst_case(desc), 0xAA);
@@ -209,9 +201,8 @@ TEST(Golden, HeaderWidthIsBigEndian258) {
     const Bytes pix = repeat_rgb(258, 0, 0, 0);
     check_golden(rgb_desc(258, 1, qoi::Colorspace::SRGB_Linear_Alpha), pix,
                  {0xFD, 0xFD, 0xFD, 0xFD, 0xC9});
-    EXPECT_EQ(qoi_test::header(258, 1, 3, 1),
-              (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x01, 0x02, 0x00, 0x00, 0x00, 0x01,
-                     0x03, 0x01}));
+    EXPECT_EQ(qoi_test::header(258, 1, 3, 1), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x01, 0x02,
+                                                     0x00, 0x00, 0x00, 0x01, 0x03, 0x01}));
 }
 
 // Height is stored big-endian too: 1x258 gives height bytes 00 00 01 02, and the
@@ -219,9 +210,8 @@ TEST(Golden, HeaderWidthIsBigEndian258) {
 TEST(Golden, HeaderHeightIsBigEndian258) {
     const Bytes pix = repeat_rgb(258, 0, 0, 0);
     check_golden(rgb_desc(1, 258), pix, {0xFD, 0xFD, 0xFD, 0xFD, 0xC9});
-    EXPECT_EQ(qoi_test::header(1, 258, 3, 0),
-              (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x02,
-                     0x03, 0x00}));
+    EXPECT_EQ(qoi_test::header(1, 258, 3, 0), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x00, 0x00, 0x01,
+                                                     0x00, 0x00, 0x01, 0x02, 0x03, 0x00}));
 }
 
 // Width 65536 = 0x00010000 -> 00 01 00 00 (third byte of the big-endian field).
@@ -232,9 +222,8 @@ TEST(Golden, HeaderWidthThirdByte65536) {
     Bytes chunks(1057, 0xFD);
     chunks.push_back(0xC1);
     check_golden(rgb_desc(65536, 1), pix, chunks);
-    EXPECT_EQ(qoi_test::header(65536, 1, 3, 0),
-              (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
-                     0x03, 0x00}));
+    EXPECT_EQ(qoi_test::header(65536, 1, 3, 0), (Bytes{0x71, 0x6F, 0x69, 0x66, 0x00, 0x01, 0x00,
+                                                       0x00, 0x00, 0x00, 0x00, 0x01, 0x03, 0x00}));
 }
 
 // The last 8 bytes of every encoded stream are 00 00 00 00 00 00 00 01, also when
@@ -292,8 +281,7 @@ TEST(Golden, SingleAlphaStepEmitsRgba) {
 // P1 (0,0,0,255): hash = 2805 = 53, slot empty; alpha 255 != previous alpha 0 ->
 // RGBA FF 00 00 00 FF.
 TEST(Golden, ZeroPixelThenOpaqueBlackEmitsIndexZeroThenRgba) {
-    check_golden(rgba_desc(2, 1), {0, 0, 0, 0, 0, 0, 0, 255},
-                 {0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF});
+    check_golden(rgba_desc(2, 1), {0, 0, 0, 0, 0, 0, 0, 255}, {0x00, 0xFF, 0x00, 0x00, 0x00, 0xFF});
 }
 
 // A 3-channel image never produces an RGBA chunk (alpha is fixed at 255). Four
@@ -433,8 +421,7 @@ TEST(Golden, DiffBoundariesPerChannel) {
 TEST(Golden, DiffAndLumaWithFourChannelsAndConstantAlpha) {
     check_golden(rgba_desc(4, 1),
                  {100, 100, 100, 7, 101, 99, 100, 7, 101, 99, 100, 8, 111, 109, 109, 8},
-                 {0xFF, 0x64, 0x64, 0x64, 0x07, 0x76, 0xFF, 0x65, 0x63, 0x64, 0x08, 0xAA,
-                  0x87});
+                 {0xFF, 0x64, 0x64, 0x64, 0x07, 0x76, 0xFF, 0x65, 0x63, 0x64, 0x08, 0xAA, 0x87});
 }
 
 // ---------------------------------------------------------------------------
@@ -686,12 +673,12 @@ TEST(Golden, NoWrapAroundControlStepsAreDiff) {
 
 // Worst case for small images: w*h*(channels+1) + 14 + 8.
 TEST(Golden, EncodeWorstCaseSmallImages) {
-    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(1, 1)), 26u);    // 1*4 + 22
-    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(1, 1)), 27u);   // 1*5 + 22
-    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(2, 3)), 46u);    // 6*4 + 22
-    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(2, 3)), 52u);   // 6*5 + 22
-    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(3, 2)), 46u);    // symmetric in w and h
-    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(100, 100)), 50022u);  // 10000*5 + 22
+    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(1, 1)), 26u);           // 1*4 + 22
+    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(1, 1)), 27u);          // 1*5 + 22
+    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(2, 3)), 46u);           // 6*4 + 22
+    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(2, 3)), 52u);          // 6*5 + 22
+    EXPECT_EQ(qoi::encode_worst_case(rgb_desc(3, 2)), 46u);           // symmetric in w and h
+    EXPECT_EQ(qoi::encode_worst_case(rgba_desc(100, 100)), 50022u);   // 10000*5 + 22
     EXPECT_EQ(qoi::encode_worst_case(rgb_desc(640, 480)), 1228822u);  // 307200*4 + 22
 }
 
@@ -714,8 +701,7 @@ TEST(Golden, ValidSizeChannelBoundaries) {
     for (const std::uint64_t channels :
          U64List{0, 1, 2, 5, 6, 7, 255, 256, 0xFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}) {
         EXPECT_FALSE(qoi::valid_size(make_desc(1, 1, channels))) << "channels " << channels;
-        EXPECT_EQ(qoi::encode_worst_case(make_desc(1, 1, channels)), 0u)
-            << "channels " << channels;
+        EXPECT_EQ(qoi::encode_worst_case(make_desc(1, 1, channels)), 0u) << "channels " << channels;
     }
     EXPECT_TRUE(qoi::valid_size(make_desc(1, 1, 3)));
     EXPECT_TRUE(qoi::valid_size(make_desc(1, 1, 4)));
@@ -749,14 +735,12 @@ TEST(Golden, ValidSizeDimensionLimits) {
     EXPECT_EQ(qoi::encode_worst_case(make_desc(1, kMaxDim, 4)), 10737418257ULL);
 
     // 2^31 and above are rejected, whatever the other dimension is.
-    for (const std::uint64_t big : U64List{kMaxDim + 1, kMaxDim + 2, 0xFFFFFFFFULL,
-                                           0x100000000ULL, 0x7FFFFFFFFFFFFFFFULL,
-                                           0xFFFFFFFFFFFFFFFFULL}) {
+    for (const std::uint64_t big : U64List{kMaxDim + 1, kMaxDim + 2, 0xFFFFFFFFULL, 0x100000000ULL,
+                                           0x7FFFFFFFFFFFFFFFULL, 0xFFFFFFFFFFFFFFFFULL}) {
         for (const std::uint64_t channels : U64List{3, 4}) {
             EXPECT_FALSE(qoi::valid_size(make_desc(big, 1, channels))) << "width " << big;
             EXPECT_FALSE(qoi::valid_size(make_desc(1, big, channels))) << "height " << big;
-            EXPECT_FALSE(qoi::valid_size(make_desc(big, big, channels)))
-                << "both " << big;
+            EXPECT_FALSE(qoi::valid_size(make_desc(big, big, channels))) << "both " << big;
             EXPECT_EQ(qoi::encode_worst_case(make_desc(big, 1, channels)), 0u);
             EXPECT_EQ(qoi::encode_worst_case(make_desc(1, big, channels)), 0u);
         }

@@ -52,8 +52,7 @@ struct Color {
 // Hash of a pixel (Ada: Hash). Computed in 8-bit modular arithmetic, as with the
 // Ada Storage_Element operators, and reduced mod 64 by the caller's index size.
 std::uint8_t hash(const Color& c) noexcept {
-    const std::uint8_t h =
-        static_cast<std::uint8_t>(c.r * 3 + c.g * 5 + c.b * 7 + c.a * 11);
+    const std::uint8_t h = static_cast<std::uint8_t>(c.r * 3 + c.g * 5 + c.b * 7 + c.a * 11);
     return static_cast<std::uint8_t>(h % 64);
 }
 
@@ -154,7 +153,8 @@ std::uint64_t encode_worst_case(const Desc& desc) noexcept {
 // Encode
 // ---------------------------------------------------------------------------
 
-std::size_t encode(Span<const std::uint8_t> pix, const Desc& desc, Span<std::uint8_t> out) noexcept {
+std::size_t encode(Span<const std::uint8_t> pix, const Desc& desc,
+                   Span<std::uint8_t> out) noexcept {
     // SPARK preconditions turned into checked conditions.
     if (!valid_size(desc)) {
         return 0;
@@ -215,8 +215,8 @@ std::size_t encode(Span<const std::uint8_t> pix, const Desc& desc, Span<std::uin
                     const Deltas d = compute_deltas(px, px_prev);
 
                     if (in_range(d.vr, -2, 1) && in_range(d.vg, -2, 1) && in_range(d.vb, -2, 1)) {
-                        buf[p++] = static_cast<std::uint8_t>(
-                            QOI_OP_DIFF | ((d.vr + 2) << 4) | ((d.vg + 2) << 2) | (d.vb + 2));
+                        buf[p++] = static_cast<std::uint8_t>(QOI_OP_DIFF | ((d.vr + 2) << 4) |
+                                                             ((d.vg + 2) << 2) | (d.vb + 2));
                     } else if (in_range(d.vg_r, -8, 7) && in_range(d.vg, -32, 31) &&
                                in_range(d.vg_b, -8, 7)) {
                         buf[p++] = static_cast<std::uint8_t>(QOI_OP_LUMA | (d.vg + 32));
@@ -346,34 +346,34 @@ std::size_t decode(Span<const std::uint8_t> data, Desc& desc, Span<std::uint8_t>
                 px.a = src[p++];
             } else {
                 switch (static_cast<std::uint8_t>(b1 & QOI_MASK_2)) {
-                    case QOI_OP_INDEX:
-                        px = seen[b1 & 0x3FU];
-                        break;
+                case QOI_OP_INDEX:
+                    px = seen[b1 & 0x3FU];
+                    break;
 
-                    case QOI_OP_DIFF:
-                        // All additions are modulo 256.
-                        px.r = static_cast<std::uint8_t>(px.r + ((b1 >> 4) & 3) - 2);
-                        px.g = static_cast<std::uint8_t>(px.g + ((b1 >> 2) & 3) - 2);
-                        px.b = static_cast<std::uint8_t>(px.b + (b1 & 3) - 2);
-                        break;
+                case QOI_OP_DIFF:
+                    // All additions are modulo 256.
+                    px.r = static_cast<std::uint8_t>(px.r + ((b1 >> 4) & 3) - 2);
+                    px.g = static_cast<std::uint8_t>(px.g + ((b1 >> 2) & 3) - 2);
+                    px.b = static_cast<std::uint8_t>(px.b + (b1 & 3) - 2);
+                    break;
 
-                    case QOI_OP_LUMA: {
-                        const std::uint8_t b2 = src[p++];
-                        const int vg = (b1 & 0x3F) - 32;
-                        px.r = static_cast<std::uint8_t>(px.r + vg + (b2 >> 4) - 8);
-                        px.g = static_cast<std::uint8_t>(px.g + vg);
-                        px.b = static_cast<std::uint8_t>(px.b + vg + (b2 & 0x0F) - 8);
-                        break;
-                    }
+                case QOI_OP_LUMA: {
+                    const std::uint8_t b2 = src[p++];
+                    const int vg = (b1 & 0x3F) - 32;
+                    px.r = static_cast<std::uint8_t>(px.r + vg + (b2 >> 4) - 8);
+                    px.g = static_cast<std::uint8_t>(px.g + vg);
+                    px.b = static_cast<std::uint8_t>(px.b + vg + (b2 & 0x0F) - 8);
+                    break;
+                }
 
-                    case QOI_OP_RUN:
-                        run = static_cast<std::uint32_t>((b1 & 0x3F) % 63);
-                        break;
+                case QOI_OP_RUN:
+                    run = static_cast<std::uint32_t>((b1 & 0x3F) % 63);
+                    break;
 
-                    default:
-                        // Unreachable: b1 & QOI_MASK_2 has only four values.
-                        assert(false);
-                        break;
+                default:
+                    // Unreachable: b1 & QOI_MASK_2 has only four values.
+                    assert(false);
+                    break;
                 }
             }
 

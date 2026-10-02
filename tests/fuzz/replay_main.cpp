@@ -27,8 +27,10 @@ bool run_file(const fs::path& path) {
         std::cerr << "cannot open " << path.string() << "\n";
         return false;
     }
-    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    std::cout << "replay " << path.filename().string() << " (" << bytes.size() << " bytes)" << std::endl;
+    const std::vector<std::uint8_t> bytes((std::istreambuf_iterator<char>(in)),
+                                          std::istreambuf_iterator<char>());
+    std::cout << "replay " << path.filename().string() << " (" << bytes.size() << " bytes)"
+              << std::endl;
     LLVMFuzzerTestOneInput(bytes.data(), bytes.size());
     return true;
 }

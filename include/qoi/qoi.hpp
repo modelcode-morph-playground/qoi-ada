@@ -30,16 +30,14 @@ inline constexpr std::size_t QOI_HEADER_SIZE = 14;
 inline constexpr std::array<std::uint8_t, 8> QOI_PADDING = {0, 0, 0, 0, 0, 0, 0, 1};
 
 // Minimal pointer-plus-size view (C++17 has no std::span).
-template <typename T>
-class Span {
+template <typename T> class Span {
 public:
     using element_type = T;
 
     constexpr Span() noexcept = default;
     constexpr Span(T* data, std::size_t size) noexcept : data_(data), size_(size) {}
 
-    template <std::size_t N>
-    constexpr Span(T (&arr)[N]) noexcept : data_(arr), size_(N) {}
+    template <std::size_t N> constexpr Span(T (&arr)[N]) noexcept : data_(arr), size_(N) {}
 
     template <typename U, std::size_t N,
               typename = std::enable_if_t<std::is_convertible_v<U (*)[], T (*)[]>>>
@@ -57,9 +55,8 @@ public:
               typename = std::enable_if_t<std::is_convertible_v<const U (*)[], T (*)[]>>>
     Span(const std::vector<U, A>& vec) noexcept : data_(vec.data()), size_(vec.size()) {}
 
-    template <typename U,
-              typename = std::enable_if_t<!std::is_same_v<U, T> &&
-                                          std::is_convertible_v<U (*)[], T (*)[]>>>
+    template <typename U, typename = std::enable_if_t<!std::is_same_v<U, T> &&
+                                                      std::is_convertible_v<U (*)[], T (*)[]>>>
     constexpr Span(Span<U> other) noexcept : data_(other.data()), size_(other.size()) {}
 
     [[nodiscard]] constexpr T* data() const noexcept { return data_; }
