@@ -65,6 +65,50 @@ inline Bytes ours_encode(const Bytes& pix, std::uint64_t width, std::uint64_t he
 // Upper limit on decoded sizes that the differential helpers will allocate.
 inline constexpr std::uint64_t kDecodeCapBytes = 1ULL << 24;
 
+// Verdict of the single header-validity / size-budget predicate shared by both
+// differential sides and the fuzz target.
+enum class DecodeBudgetKind {
+    InvalidHeader,  // width or height is 0, or channels is not 3 or 4
+    TooBig,         // valid header, but width*height*channels > kDecodeCapBytes
+    Ok,             // valid header that fits; `bytes` is width*height*channels
+};
+
+struct DecodeBudget {
+    DecodeBudgetKind kind = DecodeBudgetKind::InvalidHeader;
+    std::size_t bytes = 0;  // only meaningful when kind == Ok
+};
+
+inline DecodeBudget decode_budget(std::uint64_t width, std::uint64_t height,
+                                  std::uint64_t channels) {
+    DecodeBudget b;
+    if (width == 0 || height == 0 || channels < 3 || channels > 4) {
+        return b;
+    }
+    if (width > kDecodeCapBytes / height / channels) {
+        b.kind = DecodeBudgetKind::TooBig;
+        return b;
+    }
+    b.kind = DecodeBudgetKind::Ok;
+    b.bytes = static_cast<std::size_t>(width * height * channels);
+    return b;
+}
+
+// Reads width/height/channels straight from the 14-byte header (big-endian),
+// without using the library under test. Returns false if the buffer is shorter
+// than the header.
+inline bool parse_header_dims(const Bytes& d, std::uint64_t& w, std::uint64_t& h,
+                              std::uint64_t& c) {
+    if (d.size() < 14) {
+        return false;
+    }
+    w = (std::uint64_t{d[4]} << 24) | (std::uint64_t{d[5]} << 16) | (std::uint64_t{d[6]} << 8) |
+        d[7];
+    h = (std::uint64_t{d[8]} << 24) | (std::uint64_t{d[9]} << 16) | (std::uint64_t{d[10]} << 8) |
+        d[11];
+    c = d[12];
+    return true;
+}
+
 struct Decoded {
     bool ok = false;       // the decoder accepted the stream
     bool skipped = false;  // header declares more than kDecodeCapBytes: not run
@@ -86,22 +130,20 @@ inline Decoded ours_decode(const Bytes& data) {
     r.channels = desc.channels;
     r.colorspace = static_cast<unsigned>(desc.colorspace);
 
-    const bool dims_ok =
-        desc.width != 0 && desc.height != 0 && desc.channels >= 3 && desc.channels <= 4;
-    if (!dims_ok) {
+    const DecodeBudget budget = decode_budget(desc.width, desc.height, desc.channels);
+    if (budget.kind == DecodeBudgetKind::InvalidHeader) {
         // Invalid header: decode must fail whatever the buffer is.
         std::array<std::uint8_t, 4> tiny{};
         qoi::Desc d2;
         r.ok = qoi::decode(exact.span(), d2, tiny) != 0;
         return r;
     }
-    if (desc.width > kDecodeCapBytes / desc.height / desc.channels) {
+    if (budget.kind == DecodeBudgetKind::TooBig) {
         r.skipped = true;  // too big for the helper
         return r;
     }
 
-    const std::size_t need = static_cast<std::size_t>(desc.width * desc.height * desc.channels);
-    r.pixels.assign(need, 0);
+    r.pixels.assign(budget.bytes, 0);
     qoi::Desc d2;
     const std::size_t n = qoi::decode(exact.span(), d2, r.pixels);
     r.ok = n != 0;

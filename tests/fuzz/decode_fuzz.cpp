@@ -20,13 +20,10 @@
 #include <cstdlib>
 #include <vector>
 
+#include "diff_util.hpp"
 #include "qoi/qoi.hpp"
 
 namespace {
-
-// Largest decoded image the target allocates; bigger headers are only used to
-// exercise the "output buffer too small" path.
-constexpr std::uint64_t kMaxPixelBytes = 1ULL << 24;
 
 [[noreturn]] void fail() { std::abort(); }
 
@@ -45,8 +42,10 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
     qoi::Desc desc;
     qoi::get_desc(input, desc);
 
-    const bool header_ok =
-        desc.width != 0 && desc.height != 0 && desc.channels >= 3 && desc.channels <= 4;
+    // Headers declaring more than difftest::kDecodeCapBytes are only used to
+    // exercise the "output buffer too small" path.
+    const difftest::DecodeBudget budget =
+        difftest::decode_budget(desc.width, desc.height, desc.channels);
 
     // Decoding into no buffer at all must fail without touching memory.
     {
@@ -55,7 +54,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         check(qoi::decode(input, d, none) == 0);
     }
 
-    if (!header_ok || desc.width > kMaxPixelBytes / desc.height / desc.channels) {
+    if (budget.kind != difftest::DecodeBudgetKind::Ok) {
         // Invalid header, or an image far larger than this 64-byte buffer:
         // decode must fail without touching the output.
         std::vector<std::uint8_t> small(64, 0xA5);
@@ -67,7 +66,7 @@ extern "C" int LLVMFuzzerTestOneInput(const std::uint8_t* data, std::size_t size
         return 0;
     }
 
-    const std::size_t need = static_cast<std::size_t>(desc.width * desc.height * desc.channels);
+    const std::size_t need = budget.bytes;
 
     // One byte too small: must fail.
     {

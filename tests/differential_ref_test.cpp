@@ -51,32 +51,19 @@ struct RefDecoded {
     Bytes pixels;
 };
 
-// Parses width/height/channels from the header by hand (big-endian), without
-// using the library under test, to size the output buffer.
-bool parse_dims(const Bytes& d, std::uint64_t& w, std::uint64_t& h, std::uint64_t& c) {
-    if (d.size() < 14) {
-        return false;
-    }
-    w = (std::uint64_t{d[4]} << 24) | (std::uint64_t{d[5]} << 16) | (std::uint64_t{d[6]} << 8) |
-        d[7];
-    h = (std::uint64_t{d[8]} << 24) | (std::uint64_t{d[9]} << 16) | (std::uint64_t{d[10]} << 8) |
-        d[11];
-    c = d[12];
-    return true;
-}
-
 RefDecoded ref_decode(const Bytes& data) {
     RefDecoded r;
     std::uint64_t w = 0;
     std::uint64_t h = 0;
     std::uint64_t c = 0;
     std::size_t cap = 0;
-    if (parse_dims(data, w, h, c) && w != 0 && h != 0 && c >= 3 && c <= 4) {
-        if (w > difftest::kDecodeCapBytes / h / c) {
+    if (difftest::parse_header_dims(data, w, h, c)) {
+        const difftest::DecodeBudget budget = difftest::decode_budget(w, h, c);
+        if (budget.kind == difftest::DecodeBudgetKind::TooBig) {
             r.skipped = true;
             return r;
         }
-        cap = static_cast<std::size_t>(w * h * c);
+        cap = budget.bytes;  // 0 for InvalidHeader: the reference still sees an empty buffer
     }
     r.pixels.assign(cap, 0);
     const std::size_t n =
