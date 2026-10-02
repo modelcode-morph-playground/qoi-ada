@@ -56,17 +56,8 @@ target_link_libraries(qoi_diff_ref PRIVATE qoi_reference)
 # It is registered unconditionally, so a skip is visible in every ctest run.
 #
 # QOI_ADA_PROJECT_DIR: directory holding qoi.gpr and src/ of the Ada package.
-# The default is the repository root while the Ada sources still live there,
-# and legacy/ada afterwards. (If the cached value no longer holds qoi.gpr, the
-# script also tries legacy/ada.)
-if(EXISTS "${PROJECT_SOURCE_DIR}/qoi.gpr")
-    set(_qoi_ada_default_dir "${PROJECT_SOURCE_DIR}")
-else()
-    set(_qoi_ada_default_dir "${PROJECT_SOURCE_DIR}/legacy/ada")
-endif()
-set(QOI_ADA_PROJECT_DIR "${_qoi_ada_default_dir}" CACHE PATH
+set(QOI_ADA_PROJECT_DIR "${PROJECT_SOURCE_DIR}/legacy/ada" CACHE PATH
     "Directory with qoi.gpr and src/ of the Ada implementation (optional Ada differential test)")
-unset(_qoi_ada_default_dir)
 
 add_executable(qoi_ada_diff ada_diff_test.cpp)
 target_link_libraries(qoi_ada_diff PRIVATE qoi::qoi qoi_warnings qoi_sanitizers)
@@ -85,7 +76,6 @@ add_test(NAME qoi_ada_diff
     COMMAND ${CMAKE_COMMAND}
         -DHELPER=$<TARGET_FILE:qoi_ada_diff>
         -DADA_PROJECT_DIR=${QOI_ADA_PROJECT_DIR}
-        -DADA_FALLBACK_DIR=${PROJECT_SOURCE_DIR}/legacy/ada
         -DDRIVER_SRC_DIR=${CMAKE_CURRENT_SOURCE_DIR}/ada
         -DWORK_DIR=${CMAKE_CURRENT_BINARY_DIR}/ada_diff
         -P ${CMAKE_CURRENT_SOURCE_DIR}/ada/run_ada_diff.cmake)

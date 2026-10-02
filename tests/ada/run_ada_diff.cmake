@@ -1,7 +1,6 @@
 # Runs the optional Ada differential test (CTest test qoi_ada_diff).
 #
 #   cmake -DHELPER=<qoi_ada_diff> -DADA_PROJECT_DIR=<dir with qoi.gpr>
-#         -DADA_FALLBACK_DIR=<second place to look for qoi.gpr>
 #         -DDRIVER_SRC_DIR=<tests/ada> -DWORK_DIR=<scratch dir> -P run_ada_diff.cmake
 #
 # Steps: build tests/ada/qoi_driver.adb with the ORIGINAL Ada package (gprbuild),
@@ -50,9 +49,6 @@ endif()
 # Ada project
 # ---------------------------------------------------------------------------
 set(_project "${ADA_PROJECT_DIR}")
-if(NOT EXISTS "${_project}/qoi.gpr" AND DEFINED ADA_FALLBACK_DIR AND EXISTS "${ADA_FALLBACK_DIR}/qoi.gpr")
-    set(_project "${ADA_FALLBACK_DIR}")
-endif()
 if(NOT EXISTS "${_project}/qoi.gpr" OR NOT EXISTS "${_project}/src/qoi.adb" OR NOT EXISTS "${_project}/src/qoi.ads")
     qoi_ada_skip("no Ada project (qoi.gpr, src/qoi.ads, src/qoi.adb) in ${ADA_PROJECT_DIR}")
 endif()
