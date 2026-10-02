@@ -1,0 +1,265 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build + test matrix: GCC, Clang and MSVC, Debug ("dev" preset) and Release.
+  # Compilers are selected through CC/CXX, the presets use the Ninja generator.
+  # ---------------------------------------------------------------------------
+  build:
+    name: ${{ matrix.compiler }} / ${{ matrix.preset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [dev, release]
+        compiler: [gcc-11, gcc-12, clang-14, clang-15, msvc]
+        include:
+          - compiler: gcc-11
+            os: ubuntu-22.04
+            cc: gcc-11
+            cxx: g++-11
+            packages: gcc-11 g++-11
+          - compiler: gcc-12
+            os: ubuntu-22.04
+            cc: gcc-12
+            cxx: g++-12
+            packages: gcc-12 g++-12
+          - compiler: clang-14
+            os: ubuntu-22.04
+            cc: clang-14
+            cxx: clang++-14
+            packages: clang-14
+          - compiler: clang-15
+            os: ubuntu-22.04
+            cc: clang-15
+            cxx: clang++-15
+            packages: clang-15
+          - compiler: msvc
+            os: windows-latest
+            cc: cl
+            cxx: cl
+            packages: ""
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build ${{ matrix.packages }}
+
+      - name: Set up MSVC developer environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Ensure Ninja is available (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (-not (Get-Command ninja -ErrorAction SilentlyContinue)) {
+            choco install ninja -y
+          }
+          ninja --version
+
+      - name: Show tool versions
+        shell: bash
+        run: |
+          cmake --version
+          ninja --version
+          "$CXX" --version 2>&1 || true
+
+      - name: Configure
+        run: cmake --preset ${{ matrix.preset }} -DQOI_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+  # ---------------------------------------------------------------------------
+  # AddressSanitizer + UndefinedBehaviorSanitizer (asan-ubsan preset)
+  # ---------------------------------------------------------------------------
+  sanitizers:
+    name: asan-ubsan / ${{ matrix.compiler }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [clang-14, gcc-12]
+        include:
+          - compiler: clang-14
+            cc: clang-14
+            cxx: clang++-14
+            packages: clang-14
+          - compiler: gcc-12
+            cc: gcc-12
+            cxx: g++-12
+            packages: gcc-12 g++-12
+    env:
+      CC: ${{ matrix.cc }}
+      CXX: ${{ matrix.cxx }}
+      ASAN_OPTIONS: detect_leaks=1:strict_string_checks=1:detect_stack_use_after_return=1
+      UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build ${{ matrix.packages }}
+
+      - name: Work around ASan and high-entropy ASLR
+        run: sudo sysctl -w vm.mmap_rnd_bits=28
+
+      - name: Configure
+        run: cmake --preset asan-ubsan -DQOI_WARNINGS_AS_ERRORS=ON
+
+      - name: Build
+        run: cmake --build --preset asan-ubsan
+
+      - name: Test
+        run: ctest --preset asan-ubsan
+
+  # ---------------------------------------------------------------------------
+  # Install/export package check: install to a temporary prefix and build a
+  # tiny consumer that uses find_package(qoi CONFIG REQUIRED) + qoi::qoi.
+  # ---------------------------------------------------------------------------
+  package:
+    name: install package / ${{ matrix.linkage }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        linkage: [static, shared]
+        include:
+          - linkage: static
+            shared: "OFF"
+          - linkage: shared
+            shared: "ON"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build
+
+      - name: Configure library
+        run: |
+          cmake -S . -B build/package -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DQOI_WARNINGS_AS_ERRORS=ON \
+            -DQOI_BUILD_TESTS=OFF \
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} \
+            -DCMAKE_INSTALL_PREFIX="$RUNNER_TEMP/qoi-install"
+
+      - name: Build library
+        run: cmake --build build/package
+
+      - name: Install library
+        run: cmake --install build/package
+
+      - name: Show installed files
+        run: find "$RUNNER_TEMP/qoi-install" -type f | sort
+
+      - name: Configure consumer
+        run: |
+          cmake -S tests/package_consumer -B build/package_consumer -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/qoi-install"
+
+      - name: Build consumer
+        run: cmake --build build/package_consumer
+
+      - name: Run consumer
+        run: ctest --test-dir build/package_consumer --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # Formatting check (blocking) and clang-tidy (informational)
+  # ---------------------------------------------------------------------------
+  format:
+    name: clang-format
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang-format-14
+
+      - name: Check formatting
+        run: |
+          clang-format-14 --version
+          find include src tests -type f \( -name '*.cpp' -o -name '*.hpp' \) \
+            -not -path 'tests/third_party/*' -print0 \
+            | xargs -0 clang-format-14 --style=file --dry-run -Werror
+
+  tidy:
+    name: clang-tidy (non-blocking)
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    env:
+      CC: clang-14
+      CXX: clang++-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build clang-14 clang-tidy-14
+
+      - name: Configure (compile_commands.json)
+        run: cmake --preset dev -DQOI_BUILD_TESTS=OFF
+
+      - name: Run clang-tidy on src/
+        run: |
+          find src -type f -name '*.cpp' -print0 \
+            | xargs -0 clang-tidy-14 -p build/dev --warnings-as-errors='*'
+
+  # ---------------------------------------------------------------------------
+  # Optional Ada differential test (needs GNAT and GPRbuild). The test reports
+  # as skipped when the Ada reference cannot be built, and this job never gates
+  # the workflow.
+  # ---------------------------------------------------------------------------
+  ada-differential:
+    name: Ada differential test (optional)
+    runs-on: ubuntu-22.04
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build gnat gprbuild
+          gnat --version || true
+          gprbuild --version || true
+
+      - name: Configure
+        run: cmake --preset release
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Run Ada differential test (skips when GNAT is unusable)
+        run: ctest --preset release -L ada --no-tests=ignore
